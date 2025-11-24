@@ -2,6 +2,14 @@
 
 All notable changes to JustMark will be documented in this file.
 
+## [v0.0.2] - 2025-11-24
+
+### Added
+- 支持完整 LaTeX 数学语法，已集成 `remark-math + rehype-katex`，在编辑区、Markdown 预览与 PDF 模式下均可正确渲染。
+- 默认引入 KaTeX 样式，行内 `$...$` 与块级 `$$...$$` 均可使用，满足公式/推导需求。
+
+---
+
 ## [v0.0.1] - 2025-11-24
 
 ### Added

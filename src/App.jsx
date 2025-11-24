@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile, writeFile, readTextFile, readDir } from '@tauri-apps/plugin-fs';
+import 'katex/dist/katex.min.css';
 
 // ==============================================
 // 🛠️ 核心配置
@@ -1037,7 +1040,7 @@ function App() {
                     font-size: ${currentFont.size === 'text-sm' ? '0.8125rem' : currentFont.size === 'text-base' ? '0.9375rem' : '1.0625rem'} !important;
                   }
                 `}</style>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                   {markdown}
                 </ReactMarkdown>
               </article>
@@ -1143,7 +1146,7 @@ function App() {
                 }
               `}</style>
               <article>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                   {markdown}
                 </ReactMarkdown>
               </article>

@@ -1,7 +1,7 @@
 {
   "name": "justmark",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,11 +16,14 @@
     "@tauri-apps/plugin-opener": "^2",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.4",
+    "katex": "^0.16.25",
     "png-to-ico": "^3.0.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
+    "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
     "sharp": "^0.34.5"
   },
   "devDependencies": {
