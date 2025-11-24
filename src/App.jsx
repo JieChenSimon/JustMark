@@ -6,7 +6,7 @@ import rehypeKatex from 'rehype-katex';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { writeTextFile, writeFile, readTextFile, readDir, remove } from '@tauri-apps/plugin-fs';
+import { writeTextFile, writeFile, readTextFile, readDir, remove, mkdir } from '@tauri-apps/plugin-fs';
 import 'katex/dist/katex.min.css';
 import { useGit } from './hooks/useGit';
 import { GitPanel } from './components/GitPanel';
@@ -114,8 +114,62 @@ const BACKGROUND_COLORS = [
   },
 ];
 
+function InlineCreateRow({
+  level,
+  type,
+  value,
+  inputRef,
+  onChange,
+  onConfirm,
+  onCancel
+}) {
+  const indent = level * 12;
+  return (
+    <div
+      className="w-full px-2 py-1 text-left text-[11px] flex items-center gap-1.5 transition-all group"
+      style={{ paddingLeft: `${indent + 8}px` }}
+    >
+      <span className="flex-shrink-0">{type === 'folder' ? '📁' : '📄'}</span>
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            onConfirm();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            onCancel();
+          }
+        }}
+        className="flex-1 bg-transparent border-b border-gray-300 dark:border-gray-600 text-[11px] text-gray-800 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
+        placeholder={type === 'folder' ? '新建文件夹' : '新建文件'}
+        autoComplete="off"
+      />
+    </div>
+  );
+}
+
 // 文件树组件
-function FileTreeItem({ entry, basePath, level, currentFilePath, expandedFolders, onToggleFolder, onOpenFile, getSubfolderContents, onCreateFile, onDeleteFile }) {
+function FileTreeItem({
+  entry,
+  basePath,
+  level,
+  currentFilePath,
+  expandedFolders,
+  onToggleFolder,
+  onOpenFile,
+  getSubfolderContents,
+  onStartInlineCreate,
+  onDeleteEntry,
+  onSelectEntry,
+  inlineCreate,
+  inlineInputRef,
+  onInlineChange,
+  onInlineConfirm,
+  onInlineCancel
+}) {
   const [children, setChildren] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
@@ -136,6 +190,9 @@ function FileTreeItem({ entry, basePath, level, currentFilePath, expandedFolders
 
   const handleClick = () => {
     console.log('点击文件/文件夹:', entry.name, '完整路径:', fullPath, '是否为目录:', entry.isDirectory);
+    if (onSelectEntry) {
+      onSelectEntry(fullPath, entry.isDirectory);
+    }
     if (entry.isDirectory) {
       onToggleFolder(fullPath);
     } else {
@@ -147,6 +204,9 @@ function FileTreeItem({ entry, basePath, level, currentFilePath, expandedFolders
   const handleContextMenu = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (onSelectEntry) {
+      onSelectEntry(fullPath, entry.isDirectory);
+    }
     
     // 获取鼠标位置
     const x = e.clientX;
@@ -213,7 +273,7 @@ function FileTreeItem({ entry, basePath, level, currentFilePath, expandedFolders
             <>
               <button
                 onClick={() => {
-                  onCreateFile(fullPath);
+                  onStartInlineCreate(fullPath, 'file');
                   setContextMenu(null);
                 }}
                 className="w-full px-3 py-2 text-left text-[11px] font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-gray-700/60 active:bg-gray-200/60 dark:active:bg-gray-600/60 transition-colors flex items-center gap-2.5"
@@ -223,12 +283,24 @@ function FileTreeItem({ entry, basePath, level, currentFilePath, expandedFolders
                 </svg>
                 <span>新建文件</span>
               </button>
+              <button
+                onClick={() => {
+                  onStartInlineCreate(fullPath, 'folder');
+                  setContextMenu(null);
+                }}
+                className="w-full px-3 py-2 text-left text-[11px] font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-gray-700/60 active:bg-gray-200/60 dark:active:bg-gray-600/60 transition-colors flex items-center gap-2.5"
+              >
+                <svg className="w-3.5 h-3.5 flex-shrink-0 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 7a2 2 0 012-2h3l2 2h9a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V7z" />
+                </svg>
+                <span>新建文件夹</span>
+              </button>
               <div className="border-t border-gray-200/50 dark:border-gray-700/50 my-0.5" />
             </>
           )}
           <button
             onClick={() => {
-              onDeleteFile(fullPath);
+              onDeleteEntry(fullPath);
               setContextMenu(null);
             }}
             className="w-full px-3 py-2 text-left text-[11px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50/80 dark:hover:bg-red-500/10 active:bg-red-100/60 dark:active:bg-red-500/20 transition-colors flex items-center gap-2.5"
@@ -259,10 +331,27 @@ function FileTreeItem({ entry, basePath, level, currentFilePath, expandedFolders
                 onToggleFolder={onToggleFolder}
                 onOpenFile={onOpenFile}
                 getSubfolderContents={getSubfolderContents}
-                onCreateFile={onCreateFile}
-                onDeleteFile={onDeleteFile}
+                onStartInlineCreate={onStartInlineCreate}
+                onDeleteEntry={onDeleteEntry}
+                inlineCreate={inlineCreate}
+                inlineInputRef={inlineInputRef}
+                onInlineChange={onInlineChange}
+                onInlineConfirm={onInlineConfirm}
+                onInlineCancel={onInlineCancel}
+                onSelectEntry={onSelectEntry}
               />
             ))
+          )}
+          {inlineCreate && inlineCreate.parentPath === fullPath && (
+            <InlineCreateRow
+              level={level + 1}
+              type={inlineCreate.type}
+              value={inlineCreate.value}
+              inputRef={inlineInputRef}
+              onChange={onInlineChange}
+              onConfirm={onInlineConfirm}
+              onCancel={onInlineCancel}
+            />
           )}
         </div>
       )}
@@ -305,9 +394,12 @@ function App() {
   const [isDraggingSidebar, setIsDraggingSidebar] = useState(false);
   const [isDraggingEditor, setIsDraggingEditor] = useState(false);
 
-  // 新建文件模态框
-  const [createFileModal, setCreateFileModal] = useState(null); // { folderPath: string, inputValue: string }
-  const createFileInputRef = useRef(null);
+  // 目录上下文 & 内联新建
+  const [selectedSidebarEntry, setSelectedSidebarEntry] = useState(null); // { path: string, isDirectory: boolean }
+  const [showNewMenu, setShowNewMenu] = useState(false);
+  const newMenuRef = useRef(null);
+  const [inlineCreate, setInlineCreate] = useState(null); // { parentPath: string, type: 'file'|'folder', value: string }
+  const inlineCreateInputRef = useRef(null);
 
   const toggleTheme = () => {
     // 使用 requestAnimationFrame 优化主题切换性能
@@ -445,36 +537,44 @@ function App() {
     };
   }, []);
 
-  // 模态框自动聚焦和处理键盘事件
+  // 监听新建菜单的外部点击关闭
   useEffect(() => {
-    if (createFileModal && createFileInputRef.current) {
-      createFileInputRef.current.focus();
-      createFileInputRef.current.select();
-    }
-  }, [createFileModal]);
+    if (!showNewMenu) return;
 
-  // 模态框中的按键处理
-  useEffect(() => {
-    if (!createFileModal) return;
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        confirmCreateFile();
-      } else if (e.key === 'Escape') {
-        setCreateFileModal(null);
+    const handleClickOutside = (e) => {
+      if (newMenuRef.current && !newMenuRef.current.contains(e.target)) {
+        setShowNewMenu(false);
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [createFileModal]);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showNewMenu]);
+
+  // 当切换根目录时重置选择和菜单状态
+  useEffect(() => {
+    setShowNewMenu(false);
+    if (currentFolder) {
+      setSelectedSidebarEntry({ path: currentFolder, isDirectory: true });
+    } else {
+      setSelectedSidebarEntry(null);
+    }
+    setInlineCreate(null);
+  }, [currentFolder]);
+
+  // 内联输入自动聚焦
+  useEffect(() => {
+    if (inlineCreate && inlineCreateInputRef.current) {
+      inlineCreateInputRef.current.focus();
+      inlineCreateInputRef.current.select();
+    }
+  }, [inlineCreate?.parentPath, inlineCreate?.type]);
 
   // 键盘快捷键处理
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // 如果模态框打开，不处理快捷键（除了Escape已经在模态框中处理）
-      if (createFileModal) return;
+      // 如果正在输入新建名称，不处理快捷键
+      if (inlineCreate) return;
 
       // 检测 Mac 的 Cmd 键或 Windows/Linux 的 Ctrl 键
       const isMac = navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
@@ -484,7 +584,7 @@ function App() {
         switch(e.key.toLowerCase()) {
           case 'n':
             e.preventDefault();
-            handleNew();
+            handleNew({ fromHotkey: true });
             break;
           case 'o':
             e.preventDefault();
@@ -502,7 +602,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [hasUnsavedChanges, currentFilePath, markdown]);
+  }, [hasUnsavedChanges, currentFilePath, markdown, inlineCreate]);
 
   // 切换字体
   const handleFontChange = (index) => {
@@ -537,15 +637,155 @@ function App() {
     }
   };
 
-  // 新建文件
-  const handleNew = () => {
-    if (hasUnsavedChanges) {
-      const confirmed = confirm('当前文档有未保存的更改，确定要新建文档吗？');
-      if (!confirmed) return;
+  const handleSelectSidebarEntry = (path, isDirectory) => {
+    setSelectedSidebarEntry({ path, isDirectory });
+  };
+
+  const resolveCreationTargetPath = (explicitBasePath) => {
+    if (explicitBasePath) return explicitBasePath;
+    if (!currentFolder) return null;
+    if (!selectedSidebarEntry) return currentFolder;
+    if (selectedSidebarEntry.isDirectory) return selectedSidebarEntry.path;
+    const lastSlash = selectedSidebarEntry.path.lastIndexOf('/');
+    if (lastSlash === -1) return currentFolder;
+    return selectedSidebarEntry.path.substring(0, lastSlash);
+  };
+
+  const handleInlineNameChange = (value) => {
+    setInlineCreate(prev => (prev ? { ...prev, value } : prev));
+  };
+
+  const ensureFolderExpanded = (folderPath) => {
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      next.add(folderPath);
+      return next;
+    });
+  };
+
+  const startInlineCreate = (type = 'file', explicitBasePath) => {
+    const folderPath = resolveCreationTargetPath(explicitBasePath);
+    if (!folderPath) return;
+    if (folderPath !== currentFolder) {
+      ensureFolderExpanded(folderPath);
     }
-    setMarkdown('');
-    setCurrentFilePath(null);
-    setHasUnsavedChanges(false);
+    setInlineCreate({
+      parentPath: folderPath,
+      type,
+      value: ''
+    });
+    setShowNewMenu(false);
+  };
+
+  const startCreateEntryFromContext = (folderPath, type = 'file') => {
+    startInlineCreate(type, folderPath);
+  };
+
+  const cancelInlineCreate = () => {
+    setInlineCreate(null);
+  };
+
+  const confirmInlineCreate = async () => {
+    if (!inlineCreate || !inlineCreate.value.trim()) return;
+
+    const fileName = inlineCreate.value.trim();
+    const folderPath = inlineCreate.parentPath;
+    const isFolder = inlineCreate.type === 'folder';
+
+    if (!/^[\w\-. ]+$/.test(fileName)) {
+      alert('❌ 名称包含不允许的字符！只能使用字母、数字、下划线、连字符、点和空格。');
+      return;
+    }
+
+    if (fileName.length > 255) {
+      alert('❌ 名称过长！最多255个字符。');
+      return;
+    }
+
+    try {
+      const filePath = folderPath + '/' + fileName;
+
+      if (isFolder) {
+        await mkdir(filePath, { recursive: true });
+      } else {
+        try {
+          await readTextFile(filePath);
+          alert('❌ 文件已存在！');
+          return;
+        } catch {
+          // 文件不存在，继续创建
+        }
+        await writeTextFile(filePath, '');
+      }
+
+      setInlineCreate(null);
+
+      await refreshFolderContents(folderPath);
+
+      if (isFolder) {
+        ensureFolderExpanded(filePath);
+        setSelectedSidebarEntry({ path: filePath, isDirectory: true });
+      } else {
+        setSelectedSidebarEntry({ path: filePath, isDirectory: false });
+        setTimeout(() => {
+          handleOpenFileFromSidebar(filePath);
+        }, 100);
+      }
+    } catch (error) {
+      console.error('创建失败:', error);
+      alert('❌ 创建失败: ' + (error?.message || error));
+    }
+  };
+
+  const deleteEntryWithFallback = async (targetPath) => {
+    try {
+      await remove(targetPath, { recursive: true });
+    } catch (error) {
+      console.warn('remove API 删除失败，尝试使用 shell:', error);
+      try {
+        const { Command } = await import('@tauri-apps/plugin-shell');
+        const isWindows = navigator.userAgent.toUpperCase().includes('WINDOWS');
+
+        if (isWindows) {
+          const quotedPath = `"${targetPath}"`;
+          const cmd = new Command('cmd', ['/C', 'rd', '/s', '/q', quotedPath]);
+          const result = await cmd.execute();
+          if (result.code !== 0) {
+            throw new Error(result.stderr || 'cmd 删除失败');
+          }
+        } else {
+          const cmd = new Command('rm', ['-rf', targetPath]);
+          const result = await cmd.execute();
+          if (result.code !== 0) {
+            throw new Error(result.stderr || 'rm 删除失败');
+          }
+        }
+      } catch (shellError) {
+        console.error('shell 删除同时失败:', shellError);
+        throw error ?? shellError;
+      }
+    }
+  };
+
+  // 新建空白文档或在目录中创建条目
+  const handleNew = ({ fromHotkey = false } = {}) => {
+    if (!currentFolder) {
+      if (hasUnsavedChanges) {
+        const confirmed = confirm('当前文档有未保存的更改，确定要新建文档吗？');
+        if (!confirmed) return;
+      }
+      setMarkdown('');
+      setCurrentFilePath(null);
+      setHasUnsavedChanges(false);
+      return;
+    }
+
+    if (fromHotkey) {
+      startInlineCreate('file');
+      return;
+    }
+
+    setShowNewMenu(prev => !prev);
   };
 
   // 打开文件或文件夹按钮点击
@@ -572,6 +812,7 @@ function App() {
       setMarkdown(content);
       setCurrentFilePath(selected);
       setHasUnsavedChanges(false);
+      setSelectedSidebarEntry({ path: selected, isDirectory: false });
 
       // 提取文件夹路径并加载文件夹内容（但不自动显示侧边栏）
       const folderPath = selected.substring(0, selected.lastIndexOf('/'));
@@ -672,64 +913,10 @@ function App() {
       setMarkdown(content);
       setCurrentFilePath(filePath);
       setHasUnsavedChanges(false);
+      setSelectedSidebarEntry({ path: filePath, isDirectory: false });
     } catch (error) {
       console.error('打开文件失败:', error);
       alert('❌ 打开文件失败: ' + error.message);
-    }
-  };
-
-  // 打开创建文件的模态框
-  const handleCreateFile = (folderPath) => {
-    setCreateFileModal({
-      folderPath,
-      inputValue: ''
-    });
-  };
-
-  // 确认创建文件
-  const confirmCreateFile = async () => {
-    if (!createFileModal || !createFileModal.inputValue.trim()) return;
-
-    const fileName = createFileModal.inputValue.trim();
-    const folderPath = createFileModal.folderPath;
-
-    // 验证文件名
-    if (!/^[\w\-. ]+$/.test(fileName)) {
-      alert('❌ 文件名包含不允许的字符！只能使用字母、数字、下划线、连字符、点和空格。');
-      return;
-    }
-
-    if (fileName.length > 255) {
-      alert('❌ 文件名过长！最多255个字符。');
-      return;
-    }
-
-    try {
-      const filePath = folderPath + '/' + fileName;
-      
-      // 检查文件是否已存在
-      try {
-        await readTextFile(filePath);
-        alert('❌ 文件已存在！');
-        return;
-      } catch {
-        // 文件不存在，继续创建
-      }
-
-      // 创建文件
-      await writeTextFile(filePath, '');
-      setCreateFileModal(null);
-      
-      // 刷新文件夹内容
-      await refreshFolderContents(folderPath);
-      
-      // 自动打开新创建的文件
-      setTimeout(() => {
-        handleOpenFileFromSidebar(filePath);
-      }, 100);
-    } catch (error) {
-      console.error('创建文件失败:', error);
-      alert('❌ 创建文件失败: ' + error.message);
     }
   };
 
@@ -781,8 +968,7 @@ function App() {
     if (!confirmed) return;
 
     try {
-      // 使用 remove 删除（支持递归删除文件夹）
-      await remove(filePath, { recursive: true });
+      await deleteEntryWithFallback(filePath);
 
       // 如果删除的是当前打开的文件，则清空编辑器
       if (currentFilePath === filePath || currentFilePath?.startsWith(filePath + '/')) {
@@ -792,10 +978,13 @@ function App() {
       }
 
       // 获取父文件夹路径
-      const parentPath = filePath.substring(0, filePath.lastIndexOf('/'));
+      const lastSlashIndex = filePath.lastIndexOf('/');
+      const parentPath = lastSlashIndex > 0 ? filePath.substring(0, lastSlashIndex) : currentFolder;
       
       // 刷新父文件夹内容
-      await refreshFolderContents(parentPath);
+      if (parentPath) {
+        await refreshFolderContents(parentPath);
+      }
       
       // 从展开的文件夹集合中移除被删除的文件夹
       setExpandedFolders(prev => {
@@ -807,9 +996,13 @@ function App() {
         });
         return newSet;
       });
+
+      if (selectedSidebarEntry && (selectedSidebarEntry.path === filePath || selectedSidebarEntry.path.startsWith(filePath + '/'))) {
+        setSelectedSidebarEntry(null);
+      }
     } catch (error) {
       console.error('删除文件失败:', error);
-      alert('❌ 删除文件失败: ' + error.message);
+      alert('❌ 删除文件失败: ' + (error?.message || error));
     }
   };
 
@@ -1088,13 +1281,46 @@ function App() {
             {/* macOS窗口控制按钮占位 (红黄绿) */}
             <div className="w-14"></div>
 
-            <button
-              onClick={handleNew}
-              className="px-2 py-0.5 text-[10px] font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-all"
-              title="New (Cmd+N)"
-            >
-              New
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => handleNew()}
+                className={`px-2 py-0.5 text-[10px] font-medium rounded transition-all flex items-center gap-1 ${
+                  currentFolder
+                    ? 'text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    : 'text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-400 hover:bg-gray-100/60 dark:hover:bg-gray-800/60'
+                }`}
+                title={currentFolder ? 'New (Cmd+N)' : 'New Document (Cmd+N)'}
+              >
+                New
+                {currentFolder && (
+                  <svg className="w-3 h-3 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
+                  </svg>
+                )}
+              </button>
+
+              {currentFolder && showNewMenu && (
+                <div
+                  ref={newMenuRef}
+                  className="absolute left-0 top-7 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden animate-fade-in"
+                >
+                  <button
+                    onClick={() => startInlineCreate('file')}
+                    className="w-full px-3 py-2 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                  >
+                    <span>📄</span>
+                    <span>文件</span>
+                  </button>
+                  <button
+                    onClick={() => startInlineCreate('folder')}
+                    className="w-full px-3 py-2 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                  >
+                    <span>📁</span>
+                    <span>文件夹</span>
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Open 按钮带下拉菜单 */}
             <div className="relative flex items-center">
@@ -1324,6 +1550,17 @@ function App() {
 
                   {/* 文件树列表 */}
                   <div className="flex-1 overflow-y-auto overflow-x-hidden py-1 custom-scrollbar">
+                    {inlineCreate && inlineCreate.parentPath === currentFolder && (
+                      <InlineCreateRow
+                        level={0}
+                        type={inlineCreate.type}
+                        value={inlineCreate.value}
+                        inputRef={inlineCreateInputRef}
+                        onChange={handleInlineNameChange}
+                        onConfirm={confirmInlineCreate}
+                        onCancel={cancelInlineCreate}
+                      />
+                    )}
                     {folderContents.map((entry, index) => (
                       <FileTreeItem
                         key={index}
@@ -1335,8 +1572,14 @@ function App() {
                         onToggleFolder={toggleFolder}
                         onOpenFile={handleOpenFileFromSidebar}
                         getSubfolderContents={getSubfolderContents}
-                        onCreateFile={handleCreateFile}
-                        onDeleteFile={handleDeleteFile}
+                        onStartInlineCreate={startCreateEntryFromContext}
+                      onDeleteEntry={handleDeleteFile}
+                        inlineCreate={inlineCreate}
+                        inlineInputRef={inlineCreateInputRef}
+                        onInlineChange={handleInlineNameChange}
+                        onInlineConfirm={confirmInlineCreate}
+                        onInlineCancel={cancelInlineCreate}
+                        onSelectEntry={handleSelectSidebarEntry}
                       />
                     ))}
                   </div>
@@ -1359,7 +1602,7 @@ function App() {
 
             {/* 侧边栏拖动条 */}
             <div
-              className="w-1 bg-transparent hover:bg-gray-300/50 dark:hover:bg-gray-600/50 cursor-col-resize active:bg-gray-300 dark:active:bg-gray-600 transition-colors relative group"
+              className="w-1 bg-gray-200/70 dark:bg-gray-700/70 hover:bg-gray-300/60 dark:hover:bg-gray-600/60 cursor-col-resize active:bg-gray-300 dark:active:bg-gray-600 transition-colors relative group"
               onMouseDown={() => setIsDraggingSidebar(true)}
             >
               <div className="absolute inset-y-0 -left-1 -right-1" />
@@ -1441,7 +1684,7 @@ function App() {
 
         {/* 编辑器和预览区之间的分隔符 */}
         <div
-          className="w-1 bg-transparent hover:bg-gray-300/50 dark:hover:bg-gray-600/50 cursor-col-resize active:bg-gray-300 dark:active:bg-gray-600 transition-colors relative group"
+          className="w-1 bg-gray-200/70 dark:bg-gray-700/70 hover:bg-gray-300/60 dark:hover:bg-gray-600/60 cursor-col-resize active:bg-gray-300 dark:active:bg-gray-600 transition-colors relative group"
           onMouseDown={() => setIsDraggingEditor(true)}
         >
           <div className="absolute inset-y-0 -left-1 -right-1" />
@@ -1667,48 +1910,6 @@ function App() {
         </section>
 
       </main>
-
-      {/* 创建文件的模态框 */}
-      {createFileModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 dark:bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full mx-4">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
-              新建文件
-            </h2>
-            
-            <input
-              ref={createFileInputRef}
-              type="text"
-              value={createFileModal.inputValue}
-              onChange={(e) => setCreateFileModal({...createFileModal, inputValue: e.target.value})}
-              placeholder="输入文件名 (如 test.md)"
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:focus:ring-blue-400/50 mb-4"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  confirmCreateFile();
-                } else if (e.key === 'Escape') {
-                  setCreateFileModal(null);
-                }
-              }}
-            />
-
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setCreateFileModal(null)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
-              >
-                取消
-              </button>
-              <button
-                onClick={confirmCreateFile}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-lg transition-colors"
-              >
-                新建
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

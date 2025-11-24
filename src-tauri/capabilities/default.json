@@ -19,6 +19,7 @@
     "fs:allow-read-dir",
     "fs:allow-exists",
     "fs:allow-stat",
+    "fs:allow-remove",
     "fs:default",
     "fs:scope-home-recursive",
     "shell:allow-open",
