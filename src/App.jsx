@@ -866,7 +866,7 @@ function App() {
             <button
               onClick={handleExport}
               disabled={isExporting}
-              className="ml-2 px-2.5 py-0.5 text-[10px] font-medium bg-gray-900 text-white dark:bg-white dark:text-black rounded hover:opacity-90 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="ml-2 px-2 py-0.5 text-[10px] font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isExporting ? 'Cooking...' : 'Export'}
             </button>
