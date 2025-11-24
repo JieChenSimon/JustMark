@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === 1. 全局基础 === */
+body {
+  background-color: #F5F5F7; /* Apple 浅灰底色 */
+  color: #1D1D1F;
+  margin: 0;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden; /* 禁止整个窗口滚动，只让内容区滚动 */
+}
+
+/* === 2. 极简滚动条 (隐藏式) === */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+/* === 3. A4 纸张物理模拟 (核心) === */
+.a4-paper {
+  width: 210mm;         /* 严格 A4 宽度 */
+  min-height: 297mm;    /* 严格 A4 高度 */
+  padding: 20mm;        /* 页边距 */
+  background: white;
+  margin: 0 auto;       /* 居中 */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); /* 柔和阴影 */
+}
+
+/* === 4. PDF 导出逻辑 (打印拦截) === */
+@media print {
+  body * { visibility: hidden; } /* 隐藏所有 UI */
+  #print-target, #print-target * { 
+    visibility: visible; /* 只显示 A4 纸 */
+  }
+  #print-target {
+    position: absolute;
+    left: 0; top: 0;
+    margin: 0; padding: 0;
+    width: 100%;
+    box-shadow: none;
+  }
+}
