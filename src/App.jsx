@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -6,8 +6,10 @@ import rehypeKatex from 'rehype-katex';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { writeTextFile, writeFile, readTextFile, readDir } from '@tauri-apps/plugin-fs';
+import { writeTextFile, writeFile, readTextFile, readDir, remove } from '@tauri-apps/plugin-fs';
 import 'katex/dist/katex.min.css';
+import { useGit } from './hooks/useGit';
+import { GitPanel } from './components/GitPanel';
 
 // ==============================================
 // 🛠️ 核心配置
@@ -113,9 +115,10 @@ const BACKGROUND_COLORS = [
 ];
 
 // 文件树组件
-function FileTreeItem({ entry, basePath, level, currentFilePath, expandedFolders, onToggleFolder, onOpenFile, getSubfolderContents }) {
+function FileTreeItem({ entry, basePath, level, currentFilePath, expandedFolders, onToggleFolder, onOpenFile, getSubfolderContents, onCreateFile, onDeleteFile }) {
   const [children, setChildren] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [contextMenu, setContextMenu] = useState(null);
   const fullPath = basePath + '/' + entry.name;
   const isExpanded = expandedFolders.has(fullPath);
   const isSelected = currentFilePath === fullPath;
@@ -132,17 +135,43 @@ function FileTreeItem({ entry, basePath, level, currentFilePath, expandedFolders
   }, [isExpanded]);
 
   const handleClick = () => {
+    console.log('点击文件/文件夹:', entry.name, '完整路径:', fullPath, '是否为目录:', entry.isDirectory);
     if (entry.isDirectory) {
       onToggleFolder(fullPath);
     } else {
+      console.log('调用 onOpenFile:', fullPath);
       onOpenFile(fullPath);
     }
   };
+
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // 获取鼠标位置
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    setContextMenu({
+      x,
+      y,
+      type: entry.isDirectory ? 'folder' : 'file',
+      path: fullPath
+    });
+  };
+
+  // 点击其他地方关闭菜单
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, []);
 
   return (
     <>
       <button
         onClick={handleClick}
+        onContextMenu={handleContextMenu}
         className={`w-full px-2 py-1 text-left text-[11px] flex items-center gap-1.5 transition-all group ${
           isSelected
             ? 'bg-blue-500/15 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300'
@@ -169,6 +198,49 @@ function FileTreeItem({ entry, basePath, level, currentFilePath, expandedFolders
           {entry.name}
         </span>
       </button>
+
+      {/* macOS 风格的右键菜单 */}
+      {contextMenu && contextMenu.path === fullPath && (
+        <div
+          className="fixed z-50 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 rounded-lg shadow-lg overflow-hidden"
+          style={{ 
+            top: `${Math.min(contextMenu.y, window.innerHeight - 120)}px`, 
+            left: `${contextMenu.x}px`,
+            minWidth: '160px'
+          }}
+        >
+          {contextMenu.type === 'folder' && (
+            <>
+              <button
+                onClick={() => {
+                  onCreateFile(fullPath);
+                  setContextMenu(null);
+                }}
+                className="w-full px-3 py-2 text-left text-[11px] font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-gray-700/60 active:bg-gray-200/60 dark:active:bg-gray-600/60 transition-colors flex items-center gap-2.5"
+              >
+                <svg className="w-3.5 h-3.5 flex-shrink-0 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>新建文件</span>
+              </button>
+              <div className="border-t border-gray-200/50 dark:border-gray-700/50 my-0.5" />
+            </>
+          )}
+          <button
+            onClick={() => {
+              onDeleteFile(fullPath);
+              setContextMenu(null);
+            }}
+            className="w-full px-3 py-2 text-left text-[11px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50/80 dark:hover:bg-red-500/10 active:bg-red-100/60 dark:active:bg-red-500/20 transition-colors flex items-center gap-2.5"
+          >
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3H4v2h16V7h-3z" />
+            </svg>
+            <span>删除</span>
+          </button>
+        </div>
+      )}
+
       {entry.isDirectory && isExpanded && (
         <div>
           {isLoading ? (
@@ -187,6 +259,8 @@ function FileTreeItem({ entry, basePath, level, currentFilePath, expandedFolders
                 onToggleFolder={onToggleFolder}
                 onOpenFile={onOpenFile}
                 getSubfolderContents={getSubfolderContents}
+                onCreateFile={onCreateFile}
+                onDeleteFile={onDeleteFile}
               />
             ))
           )}
@@ -212,13 +286,121 @@ function App() {
   const [showIndicator, setShowIndicator] = useState(true);
   const [showBgColorWarning, setShowBgColorWarning] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [sidebarView, setSidebarView] = useState('files'); // 'files' or 'git'
   const [currentFolder, setCurrentFolder] = useState(null);
   const [folderContents, setFolderContents] = useState([]);
   const [expandedFolders, setExpandedFolders] = useState(new Set());
   const indicatorTimeoutRef = useRef(null);
   const warningTimeoutRef = useRef(null);
 
-  const toggleTheme = () => setIsDarkMode(!isDarkMode);
+  // Git 集成
+  const git = useGit(currentFolder);
+  const [gitPanelVisible, setGitPanelVisible] = useState(false);
+  const [pdfScale, setPdfScale] = useState(1);
+  const pdfContainerRef = useRef(null);
+
+  // 可调整面板宽度
+  const [sidebarWidth, setSidebarWidth] = useState(224); // 默认 14rem = 224px (w-56)
+  const [editorWidth, setEditorWidth] = useState(50); // 编辑器占比 50%
+  const [isDraggingSidebar, setIsDraggingSidebar] = useState(false);
+  const [isDraggingEditor, setIsDraggingEditor] = useState(false);
+
+  // 新建文件模态框
+  const [createFileModal, setCreateFileModal] = useState(null); // { folderPath: string, inputValue: string }
+  const createFileInputRef = useRef(null);
+
+  const toggleTheme = () => {
+    // 使用 requestAnimationFrame 优化主题切换性能
+    requestAnimationFrame(() => {
+      setIsDarkMode(!isDarkMode);
+    });
+  };
+
+  // PDF 自动缩放以适应窗口和拖动
+  useEffect(() => {
+    if (previewMode !== 'pdf' || !pdfContainerRef.current) return;
+
+    const updatePdfScale = () => {
+      const container = pdfContainerRef.current;
+      if (!container) return;
+
+      const containerWidth = container.clientWidth;
+      // A4纸张宽度 210mm,换算为像素 (1mm ≈ 3.7795px)
+      const pdfWidth = 210 * 3.7795; // 约793px
+
+      // 计算缩放比例,让PDF始终填满容器宽度
+      const scale = containerWidth / pdfWidth;
+      setPdfScale(scale);
+    };
+
+    updatePdfScale();
+    
+    // 使用 ResizeObserver 监听容器宽度变化（用于拖动分隔符时的自适应）
+    const resizeObserver = new ResizeObserver(() => {
+      updatePdfScale();
+    });
+    
+    resizeObserver.observe(pdfContainerRef.current);
+    window.addEventListener('resize', updatePdfScale);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updatePdfScale);
+    };
+  }, [previewMode]);
+
+  // 处理侧边栏拖动
+  useEffect(() => {
+    if (!isDraggingSidebar) return;
+
+    const handleMouseMove = (e) => {
+      const newWidth = e.clientX;
+      if (newWidth >= 150 && newWidth <= 400) {
+        setSidebarWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingSidebar(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingSidebar]);
+
+  // 处理编辑器/预览区拖动
+  useEffect(() => {
+    if (!isDraggingEditor) return;
+
+    const handleMouseMove = (e) => {
+      const container = document.querySelector('main');
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const newPercent = ((e.clientX - rect.left) / rect.width) * 100;
+
+      if (newPercent >= 20 && newPercent <= 80) {
+        setEditorWidth(newPercent);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingEditor(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingEditor]);
 
   // 显示指示器并设置自动隐藏
   const showPreviewIndicator = () => {
@@ -263,9 +445,37 @@ function App() {
     };
   }, []);
 
+  // 模态框自动聚焦和处理键盘事件
+  useEffect(() => {
+    if (createFileModal && createFileInputRef.current) {
+      createFileInputRef.current.focus();
+      createFileInputRef.current.select();
+    }
+  }, [createFileModal]);
+
+  // 模态框中的按键处理
+  useEffect(() => {
+    if (!createFileModal) return;
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        confirmCreateFile();
+      } else if (e.key === 'Escape') {
+        setCreateFileModal(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [createFileModal]);
+
   // 键盘快捷键处理
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // 如果模态框打开，不处理快捷键（除了Escape已经在模态框中处理）
+      if (createFileModal) return;
+
       // 检测 Mac 的 Cmd 键或 Windows/Linux 的 Ctrl 键
       const isMac = navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
       const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
@@ -455,14 +665,151 @@ function App() {
 
   // 从侧边栏打开文件
   const handleOpenFileFromSidebar = async (filePath) => {
+    console.log('尝试打开文件:', filePath);
     try {
       const content = await readTextFile(filePath);
+      console.log('文件读取成功，内容长度:', content.length);
       setMarkdown(content);
       setCurrentFilePath(filePath);
       setHasUnsavedChanges(false);
     } catch (error) {
       console.error('打开文件失败:', error);
       alert('❌ 打开文件失败: ' + error.message);
+    }
+  };
+
+  // 打开创建文件的模态框
+  const handleCreateFile = (folderPath) => {
+    setCreateFileModal({
+      folderPath,
+      inputValue: ''
+    });
+  };
+
+  // 确认创建文件
+  const confirmCreateFile = async () => {
+    if (!createFileModal || !createFileModal.inputValue.trim()) return;
+
+    const fileName = createFileModal.inputValue.trim();
+    const folderPath = createFileModal.folderPath;
+
+    // 验证文件名
+    if (!/^[\w\-. ]+$/.test(fileName)) {
+      alert('❌ 文件名包含不允许的字符！只能使用字母、数字、下划线、连字符、点和空格。');
+      return;
+    }
+
+    if (fileName.length > 255) {
+      alert('❌ 文件名过长！最多255个字符。');
+      return;
+    }
+
+    try {
+      const filePath = folderPath + '/' + fileName;
+      
+      // 检查文件是否已存在
+      try {
+        await readTextFile(filePath);
+        alert('❌ 文件已存在！');
+        return;
+      } catch {
+        // 文件不存在，继续创建
+      }
+
+      // 创建文件
+      await writeTextFile(filePath, '');
+      setCreateFileModal(null);
+      
+      // 刷新文件夹内容
+      await refreshFolderContents(folderPath);
+      
+      // 自动打开新创建的文件
+      setTimeout(() => {
+        handleOpenFileFromSidebar(filePath);
+      }, 100);
+    } catch (error) {
+      console.error('创建文件失败:', error);
+      alert('❌ 创建文件失败: ' + error.message);
+    }
+  };
+
+  // 刷新文件夹内容
+  const refreshFolderContents = async (folderPath) => {
+    try {
+      const entries = await readDir(folderPath);
+      const filtered = entries
+        .filter(entry => {
+          if (entry.isDirectory) return true;
+          const name = entry.name.toLowerCase();
+          return name.endsWith('.md') || name.endsWith('.markdown') || name.endsWith('.txt');
+        })
+        .sort((a, b) => {
+          if (a.isDirectory && !b.isDirectory) return -1;
+          if (!a.isDirectory && b.isDirectory) return 1;
+          return a.name.localeCompare(b.name);
+        });
+
+      // 如果是根目录，更新根目录内容
+      if (currentFolder === folderPath) {
+        setFolderContents(filtered);
+      }
+
+      // 如果文件夹已展开，刷新它
+      if (expandedFolders.has(folderPath)) {
+        setExpandedFolders(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(folderPath);
+          return newSet;
+        });
+        setTimeout(() => {
+          setExpandedFolders(prev => {
+            const newSet = new Set(prev);
+            newSet.add(folderPath);
+            return newSet;
+          });
+        }, 0);
+      }
+    } catch (error) {
+      console.error('刷新文件夹失败:', error);
+    }
+  };
+
+  // 删除文件或文件夹
+  const handleDeleteFile = async (filePath) => {
+    const fileName = filePath.split('/').pop();
+    const confirmed = confirm(`确定要删除 "${fileName}" 吗？`);
+    if (!confirmed) return;
+
+    try {
+      // 使用 remove 删除（支持递归删除文件夹）
+      await remove(filePath, { recursive: true });
+
+      // 如果删除的是当前打开的文件，则清空编辑器
+      if (currentFilePath === filePath || currentFilePath?.startsWith(filePath + '/')) {
+        setMarkdown('');
+        setCurrentFilePath(null);
+        setHasUnsavedChanges(false);
+      }
+
+      // 获取父文件夹路径
+      const parentPath = filePath.substring(0, filePath.lastIndexOf('/'));
+      
+      // 刷新父文件夹内容
+      await refreshFolderContents(parentPath);
+      
+      // 从展开的文件夹集合中移除被删除的文件夹
+      setExpandedFolders(prev => {
+        const newSet = new Set(prev);
+        Array.from(newSet).forEach(path => {
+          if (path === filePath || path.startsWith(filePath + '/')) {
+            newSet.delete(path);
+          }
+        });
+        return newSet;
+      });
+    } catch (error) {
+      console.error('删除文件失败:', error);
+      alert('❌ 删除文件失败: ' + error.message);
     }
   };
 
@@ -642,10 +989,17 @@ function App() {
     : (isDarkMode ? currentBgColor.bgDark : currentBgColor.bgLight);
   const shouldInvertPreview = isDarkMode && !isPaperWhite;
 
+  // 使用 useMemo 缓存 markdown 渲染内容，避免主题切换时重新渲染
+  const renderedMarkdown = useMemo(() => (
+    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+      {markdown}
+    </ReactMarkdown>
+  ), [markdown]);
+
   return (
     <div className={`${isDarkMode ? 'dark' : ''} h-screen w-screen flex flex-col transition-colors duration-300`}>
       
-      {/* 添加打印样式 */}
+      {/* 添加打印样式和 macOS 风格动画 */}
       <style>{`
         @media print {
           /* 隐藏工具栏和左侧编辑区 */
@@ -665,6 +1019,62 @@ function App() {
             box-shadow: none !important;
             max-width: 100% !important;
           }
+        }
+
+        /* macOS 风格的自定义滚动条 */
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(0, 0, 0, 0.15);
+          border-radius: 10px;
+          border: 2px solid transparent;
+          background-clip: padding-box;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.15);
+          border: 2px solid transparent;
+          background-clip: padding-box;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(0, 0, 0, 0.25);
+          border: 2px solid transparent;
+          background-clip: padding-box;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.25);
+          border: 2px solid transparent;
+          background-clip: padding-box;
+        }
+
+        /* macOS 风格的淡入动画 */
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(-4px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.2s ease-out;
+        }
+
+        /* 平滑的颜色过渡 - 仅应用于关键元素 */
+        header, .sidebar-item, button, input, textarea, select {
+          transition-property: background-color, border-color, color;
+          transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+          transition-duration: 150ms;
+        }
+
+        /* 使用 CSS 变量和 will-change 优化性能 */
+        .dark {
+          color-scheme: dark;
         }
       `}</style>
       
@@ -880,50 +1290,81 @@ function App() {
       {/* === 主工作区 === */}
       <main className="flex-1 flex overflow-hidden">
 
-        {/* 左侧：输入区 + 文件浏览器 */}
-        <section className="w-1/2 h-full border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 transition-colors duration-300 relative flex">
-          {/* 文件浏览器侧边栏 - macOS 风格 */}
+        {/* 左侧：输入区 + 文件浏览器 + Git 面板 */}
+        <section
+          className="h-full border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 transition-colors duration-300 relative flex"
+          style={{ width: `${editorWidth}%` }}
+        >
+          {/* 侧边栏 - macOS 风格 */}
           {sidebarVisible && currentFolder && (
-            <div
-              className="w-56 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-700/50 flex flex-col transition-all duration-300 ease-out"
-            >
-              {/* 侧边栏头部 - macOS 风格 */}
-              <div className="h-10 px-3 flex items-center justify-between border-b border-gray-200/80 dark:border-gray-700/80 bg-gradient-to-b from-gray-50/80 to-white/60 dark:from-gray-800/80 dark:to-gray-900/60">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 truncate">
-                    {currentFolder.split('/').pop() || 'Files'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setSidebarVisible(false)}
-                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200/70 dark:hover:bg-gray-700/70 transition-all active:scale-95"
-                    title="Close"
-                  >
-                    <svg className="w-3 h-3 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+            <>
+              <div
+                className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-700/50 flex flex-col"
+                style={{ width: `${sidebarWidth}px` }}
+              >
+              {sidebarView === 'files' ? (
+                <>
+                  {/* 文件浏览器头部 */}
+                  <div className="h-10 px-3 flex items-center justify-between border-b border-gray-200/80 dark:border-gray-700/80 bg-gradient-to-b from-gray-50/80 to-white/60 dark:from-gray-800/80 dark:to-gray-900/60 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 truncate">
+                        {currentFolder.split('/').pop() || 'Files'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setSidebarVisible(false)}
+                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200/70 dark:hover:bg-gray-700/70 transition-all active:scale-95"
+                      title="Close"
+                    >
+                      <svg className="w-3 h-3 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
 
-              {/* 文件树列表 */}
-              <div className="flex-1 overflow-y-auto overflow-x-hidden py-1 custom-scrollbar">
-                {folderContents.map((entry, index) => (
-                  <FileTreeItem
-                    key={index}
-                    entry={entry}
-                    basePath={currentFolder}
-                    level={0}
-                    currentFilePath={currentFilePath}
-                    expandedFolders={expandedFolders}
-                    onToggleFolder={toggleFolder}
-                    onOpenFile={handleOpenFileFromSidebar}
-                    getSubfolderContents={getSubfolderContents}
-                  />
-                ))}
-              </div>
+                  {/* 文件树列表 */}
+                  <div className="flex-1 overflow-y-auto overflow-x-hidden py-1 custom-scrollbar">
+                    {folderContents.map((entry, index) => (
+                      <FileTreeItem
+                        key={index}
+                        entry={entry}
+                        basePath={currentFolder}
+                        level={0}
+                        currentFilePath={currentFilePath}
+                        expandedFolders={expandedFolders}
+                        onToggleFolder={toggleFolder}
+                        onOpenFile={handleOpenFileFromSidebar}
+                        getSubfolderContents={getSubfolderContents}
+                        onCreateFile={handleCreateFile}
+                        onDeleteFile={handleDeleteFile}
+                      />
+                    ))}
+                  </div>
+                </>
+              ) : (
+                /* Git 源代码管理面板 */
+                <GitPanel
+                  gitStatus={git.status}
+                  onStageFile={git.stageFile}
+                  onUnstageFile={git.unstageFile}
+                  onStageAll={git.stageAll}
+                  onUnstageAll={git.unstageAll}
+                  onCommit={git.commit}
+                  onDiscardChanges={git.discardChanges}
+                  onGetLog={git.getLog}
+                  onClose={() => setSidebarVisible(false)}
+                />
+              )}
             </div>
+
+            {/* 侧边栏拖动条 */}
+            <div
+              className="w-1 bg-transparent hover:bg-gray-300/50 dark:hover:bg-gray-600/50 cursor-col-resize active:bg-gray-300 dark:active:bg-gray-600 transition-colors relative group"
+              onMouseDown={() => setIsDraggingSidebar(true)}
+            >
+              <div className="absolute inset-y-0 -left-1 -right-1" />
+            </div>
+          </>
           )}
 
           {/* 编辑器文本区域 */}
@@ -935,27 +1376,62 @@ function App() {
               }}
               value={markdown}
               onChange={handleMarkdownChange}
-              placeholder="开始输入..."
+              placeholder="JustMark..."
               spellCheck="false"
             />
 
-            {/* 左下角：文件夹按钮和文件名 */}
-            <div className="absolute bottom-4 left-4 flex items-center gap-2 z-20">
-              {/* 切换侧边栏按钮 - 只在有文件夹时显示 */}
+            {/* 左下角：侧边栏导航按钮和文件名 */}
+            <div className="absolute bottom-4 left-4 flex items-end gap-2 z-20">
+              {/* 侧边栏导航按钮组 - 只在有文件夹时显示 */}
               {currentFolder && (
-                <button
-                  onClick={() => setSidebarVisible(!sidebarVisible)}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100/80 dark:bg-gray-800/80 hover:bg-gray-200/90 dark:hover:bg-gray-700/90 border border-gray-300/50 dark:border-gray-600/50 backdrop-blur-sm shadow-md transition-all active:scale-95"
-                  title={sidebarVisible ? '隐藏目录' : '显示目录'}
-                >
-                  <svg className="w-4 h-4 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                  </svg>
-                </button>
+                <div className="flex flex-col gap-1">
+                  {/* Git 源代码管理按钮 */}
+                  <button
+                    onClick={() => {
+                      setSidebarView('git');
+                      setSidebarVisible(true);
+                    }}
+                    className={`w-8 h-8 flex items-center justify-center rounded-lg backdrop-blur-sm shadow-md transition-all active:scale-95 relative ${
+                      sidebarVisible && sidebarView === 'git'
+                        ? 'bg-blue-500/20 dark:bg-blue-500/30 border border-blue-400/50 dark:border-blue-400/50'
+                        : 'bg-gray-100/80 dark:bg-gray-800/80 hover:bg-gray-200/90 dark:hover:bg-gray-700/90 border border-gray-300/50 dark:border-gray-600/50'
+                    }`}
+                    title="源代码管理"
+                  >
+                    <svg className={`w-4 h-4 ${sidebarVisible && sidebarView === 'git' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    </svg>
+                    {/* 更改数量徽章 */}
+                    {git.status?.hasChanges && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-md">
+                        {git.status.files?.length > 9 ? '9+' : git.status.files?.length}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* 文件浏览器按钮 */}
+                  <button
+                    onClick={() => {
+                      setSidebarView('files');
+                      setSidebarVisible(!sidebarVisible);
+                    }}
+                    className={`w-8 h-8 flex items-center justify-center rounded-lg backdrop-blur-sm shadow-md transition-all active:scale-95 ${
+                      sidebarVisible && sidebarView === 'files'
+                        ? 'bg-blue-500/20 dark:bg-blue-500/30 border border-blue-400/50 dark:border-blue-400/50'
+                        : 'bg-gray-100/80 dark:bg-gray-800/80 hover:bg-gray-200/90 dark:hover:bg-gray-700/90 border border-gray-300/50 dark:border-gray-600/50'
+                    }`}
+                    title={sidebarVisible && sidebarView === 'files' ? '隐藏目录' : '显示目录'}
+                  >
+                    <svg className={`w-4 h-4 ${sidebarVisible && sidebarView === 'files' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                  </button>
+                </div>
               )}
+
               {/* 文件名显示 */}
               {currentFilePath && (
-                <span className="px-2.5 py-1 text-[10px] text-gray-500 dark:text-gray-400 bg-gray-100/80 dark:bg-gray-800/80 rounded-lg border border-gray-300/50 dark:border-gray-600/50 backdrop-blur-sm shadow-sm">
+                <span className="px-2.5 py-1 text-[10px] text-gray-500 dark:text-gray-400 bg-gray-100/80 dark:bg-gray-800/80 rounded-lg border border-gray-300/50 dark:border-gray-600/50 backdrop-blur-sm shadow-sm mb-0.5">
                   {currentFilePath.split('/').pop()}
                 </span>
               )}
@@ -963,9 +1439,18 @@ function App() {
           </div>
         </section>
 
+        {/* 编辑器和预览区之间的分隔符 */}
+        <div
+          className="w-1 bg-transparent hover:bg-gray-300/50 dark:hover:bg-gray-600/50 cursor-col-resize active:bg-gray-300 dark:active:bg-gray-600 transition-colors relative group"
+          onMouseDown={() => setIsDraggingEditor(true)}
+        >
+          <div className="absolute inset-y-0 -left-1 -right-1" />
+        </div>
+
         {/* 右侧：预览区 */}
         <section
-          className="w-1/2 h-full overflow-y-auto p-6 flex justify-center transition-colors duration-300 relative"
+          ref={pdfContainerRef}
+          className="flex-1 h-full overflow-y-auto flex justify-center transition-colors duration-300 relative"
           style={{ backgroundColor: previewBgColor }}
           onClick={handlePreviewClick}
         >
@@ -983,7 +1468,7 @@ function App() {
 
           {previewMode === 'markdown' ? (
             /* Markdown 预览模式 - 正常网页效果 */
-            <div className="w-full max-w-4xl">
+            <div className="w-full max-w-4xl p-6">
               <article
                 className={`prose max-w-none prose-headings:font-semibold ${shouldInvertPreview ? 'dark:prose-invert' : ''}`}
                 style={{ 
@@ -1040,27 +1525,39 @@ function App() {
                     font-size: ${currentFont.size === 'text-sm' ? '0.8125rem' : currentFont.size === 'text-base' ? '0.9375rem' : '1.0625rem'} !important;
                   }
                 `}</style>
-                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-                  {markdown}
-                </ReactMarkdown>
+                {renderedMarkdown}
               </article>
             </div>
           ) : (
-            /* PDF 预览模式 - LaTeX 论文风格的 A4 页面 */
-            <div
-              id="print-target"
-              className="bg-white shadow-2xl"
-              style={{
-                width: '210mm',
-                minHeight: '297mm',
-                padding: '20mm 25mm',
-                fontFamily: currentFontFamily.family,
-                fontSize: currentFont.size === 'text-sm' ? '10pt' : currentFont.size === 'text-base' ? '11pt' : '12pt',
-                lineHeight: '1.5',
-                color: '#000',
-              }}
-            >
+            /* PDF 预览模式 - LaTeX 论文风格的 A4 页面，带动态缩放 */
+            <div className="pdf-preview-container" style={{
+              width: '100%',
+              height: '100%',
+            }}>
+              <div
+                id="print-target"
+                style={{
+                  width: '210mm',
+                  minHeight: '297mm',
+                  padding: '20mm 25mm',
+                  fontFamily: currentFontFamily.family,
+                  fontSize: currentFont.size === 'text-sm' ? '10pt' : currentFont.size === 'text-base' ? '11pt' : '12pt',
+                  lineHeight: '1.5',
+                  color: '#000',
+                  backgroundColor: '#ffffff',
+                  transform: `scale(${pdfScale})`,
+                  transformOrigin: 'top left',
+                  boxSizing: 'border-box',
+                  transition: 'transform 0.2s ease-out',
+                }}
+              >
               <style>{`
+                #print-target {
+                  background-color: #ffffff !important;
+                }
+                #print-target * {
+                  background-color: transparent !important;
+                }
                 #print-target h1 {
                   font-size: 18pt;
                   font-weight: 700;
@@ -1068,6 +1565,7 @@ function App() {
                   margin-bottom: 12pt;
                   text-align: center;
                   line-height: 1.2;
+                  color: #000 !important;
                 }
                 #print-target h2 {
                   font-size: 14pt;
@@ -1075,6 +1573,7 @@ function App() {
                   margin-top: 16pt;
                   margin-bottom: 8pt;
                   line-height: 1.2;
+                  color: #000 !important;
                 }
                 #print-target h3 {
                   font-size: 12pt;
@@ -1082,30 +1581,35 @@ function App() {
                   margin-top: 12pt;
                   margin-bottom: 6pt;
                   line-height: 1.2;
+                  color: #000 !important;
                 }
                 #print-target p {
                   margin-top: 0;
                   margin-bottom: 8pt;
                   text-align: justify;
                   text-indent: 0;
+                  color: #000 !important;
                 }
                 #print-target ul, #print-target ol {
                   margin-top: 6pt;
                   margin-bottom: 8pt;
                   padding-left: 1.5em;
+                  color: #000 !important;
                 }
                 #print-target li {
                   margin-bottom: 3pt;
+                  color: #000 !important;
                 }
                 #print-target code {
                   font-family: 'Courier New', monospace;
                   font-size: 10pt;
-                  background: #f5f5f5;
+                  background: #f5f5f5 !important;
                   padding: 2px 4px;
                   border-radius: 2px;
+                  color: #000 !important;
                 }
                 #print-target pre {
-                  background: #f5f5f5;
+                  background: #f5f5f5 !important;
                   padding: 12pt;
                   margin: 12pt 0;
                   border-left: 3pt solid #ddd;
@@ -1113,30 +1617,39 @@ function App() {
                   font-size: 10pt;
                   line-height: 1.4;
                 }
+                #print-target pre code {
+                  background: transparent !important;
+                  color: #000 !important;
+                }
                 #print-target blockquote {
                   margin: 12pt 0;
                   padding: 8pt 16pt;
                   border-left: 4pt solid #ddd;
-                  background: #fafafa;
+                  background: #fafafa !important;
                   font-style: italic;
+                  color: #000 !important;
                 }
                 #print-target table {
                   width: 100%;
                   border-collapse: collapse;
                   margin: 12pt 0;
                   font-size: 10pt;
+                  color: #000 !important;
                 }
                 #print-target th, #print-target td {
                   border: 1pt solid #ddd;
                   padding: 6pt 10pt;
                   text-align: left;
+                  color: #000 !important;
+                  background: transparent !important;
                 }
                 #print-target th {
-                  background: #f5f5f5;
+                  background: #f5f5f5 !important;
                   font-weight: 600;
+                  color: #000 !important;
                 }
                 #print-target a {
-                  color: #0066cc;
+                  color: #0066cc !important;
                   text-decoration: none;
                 }
                 #print-target hr {
@@ -1146,15 +1659,56 @@ function App() {
                 }
               `}</style>
               <article>
-                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-                  {markdown}
-                </ReactMarkdown>
+                {renderedMarkdown}
               </article>
+              </div>
             </div>
           )}
         </section>
 
       </main>
+
+      {/* 创建文件的模态框 */}
+      {createFileModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 dark:bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full mx-4">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
+              新建文件
+            </h2>
+            
+            <input
+              ref={createFileInputRef}
+              type="text"
+              value={createFileModal.inputValue}
+              onChange={(e) => setCreateFileModal({...createFileModal, inputValue: e.target.value})}
+              placeholder="输入文件名 (如 test.md)"
+              className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:focus:ring-blue-400/50 mb-4"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  confirmCreateFile();
+                } else if (e.key === 'Escape') {
+                  setCreateFileModal(null);
+                }
+              }}
+            />
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setCreateFileModal(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={confirmCreateFile}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-lg transition-colors"
+              >
+                新建
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

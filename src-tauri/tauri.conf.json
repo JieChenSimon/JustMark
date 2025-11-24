@@ -11,15 +11,16 @@
   },
   "app": {
     "windows": [
-      { 
+      {
         "title": "JustMark",
-        "width": 1200,          
-        "height": 800,          
+        "width": 1200,
+        "height": 800,
         "resizable": true,
         "fullscreen": false,
         "center": true,
-        "titleBarStyle": "Overlay", 
-        "hiddenTitle": true
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "devtools": true
       }
     ],
     "security": {

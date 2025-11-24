@@ -6,14 +6,42 @@
   "permissions": [
     "core:default",
     "opener:default",
+    "dialog:default",
     "dialog:allow-save",
     "dialog:allow-open",
+    "dialog:allow-message",
+    "dialog:allow-ask",
+    "dialog:allow-confirm",
     "fs:allow-write-file",
     "fs:allow-write-text-file",
     "fs:allow-read-file",
     "fs:allow-read-text-file",
     "fs:allow-read-dir",
     "fs:allow-exists",
-    "fs:allow-stat"
+    "fs:allow-stat",
+    "fs:default",
+    "fs:scope-home-recursive",
+    "shell:allow-open",
+    "shell:allow-execute",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "git",
+          "cmd": "git",
+          "args": true
+        }
+      ]
+    },
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$DESKTOP/**" },
+        { "path": "$DOCUMENT/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$RESOURCE/**" }
+      ]
+    }
   ]
 }
