@@ -2,6 +2,13 @@
 
 All notable changes to JustMark will be documented in this file.
 
+## [v0.0.3] - 2025-11-24
+
+### Changed
+- 版本号提升至 `v0.0.3` 并重新编译最新构建，以便同步发布。
+
+---
+
 ## [v0.0.2] - 2025-11-24
 
 ### Added
