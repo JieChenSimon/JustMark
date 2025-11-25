@@ -2114,7 +2114,7 @@ function App() {
 
           {/* 预览区颜色选择按钮 - 仅在 Markdown 模式下显示 */}
           {previewMode === 'markdown' && (
-            <div className="absolute top-16 right-4 z-10">
+            <div className="absolute bottom-6 right-6 z-10">
               <div className="relative">
                 <button
                   onClick={() => setShowPreviewBgColorMenu(!showPreviewBgColorMenu)}
@@ -2129,7 +2129,7 @@ function App() {
 
                 {/* 预览区颜色选项菜单 */}
                 {showPreviewBgColorMenu && (
-                  <div className="absolute right-0 top-10 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <div className="absolute right-0 bottom-10 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 rounded-lg shadow-xl z-50 overflow-hidden">
                     {/* 重置为主题颜色选项 */}
                     <button
                       onClick={() => {
