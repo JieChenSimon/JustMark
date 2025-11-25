@@ -20,11 +20,64 @@
         "center": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "devtools": true
+        "decorations": true,
+        "devtools": true,
+        "dragDropEnabled": false
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": [
+        {
+          "identifier": "main-capability",
+          "description": "Capability for the main window",
+          "windows": ["main"],
+          "permissions": [
+            "core:default",
+            "core:window:allow-start-dragging",
+            "core:window:allow-set-title",
+            "core:window:allow-center",
+            "core:window:allow-set-size",
+            "core:window:allow-set-position",
+            "dialog:allow-open",
+            "dialog:allow-save",
+            "fs:default",
+            {
+              "identifier": "fs:scope",
+              "allow": [
+                { "path": "**" },
+                { "path": "$HOME/**" },
+                { "path": "$DOCUMENT/**" },
+                { "path": "$DESKTOP/**" },
+                { "path": "$DOWNLOAD/**" }
+              ]
+            },
+            "fs:allow-read-text-file",
+            "fs:allow-read-dir",
+            "fs:allow-write-text-file",
+            "fs:allow-write-file",
+            "fs:allow-remove",
+            "fs:allow-mkdir",
+            "fs:allow-exists",
+            "fs:allow-read-file",
+            "fs:allow-stat",
+            "fs:allow-lstat",
+            "fs:allow-fstat",
+            "shell:allow-execute",
+            "shell:allow-open",
+            {
+              "identifier": "shell:allow-execute",
+              "allow": [
+                {
+                  "name": "git",
+                  "cmd": "git",
+                  "args": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   "bundle": {

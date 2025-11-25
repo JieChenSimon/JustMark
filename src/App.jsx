@@ -80,36 +80,36 @@ const FONT_OPTIONS = [
   { label: 'Large',  size: 'text-lg',   leading: 'leading-8', name: '大号' },
 ];
 
-// 广受好评的阅读背景色配置
+// 阅读背景色配置（仅用于预览区）
 const BACKGROUND_COLORS = [
   {
+    name: 'Paper White',
+    bg: '#FFFFFF',
+    text: '#1D1D1F',
+    description: 'Pure & clean'
+  },
+  {
     name: 'Light Gray',
-    bgLight: '#F5F5F7',
-    bgDark: '#111',
+    bg: '#F5F5F7',
+    text: '#1D1D1F',
     description: 'Default neutral'
   },
   {
     name: 'Sepia',
-    bgLight: '#F4ECD8',
-    bgDark: '#2B2416',
+    bg: '#F4ECD8',
+    text: '#3D2817',
     description: 'Warm & comfortable'
   },
   {
     name: 'Green Tea',
-    bgLight: '#E3EDCD',
-    bgDark: '#1C2614',
+    bg: '#E3EDCD',
+    text: '#2C3A1E',
     description: 'Eye protection'
   },
   {
-    name: 'Paper White',
-    bgLight: '#FEFEFE',
-    bgDark: '#0D0D0D',
-    description: 'Pure & clean'
-  },
-  {
     name: 'Blue Light',
-    bgLight: '#E8F4F8',
-    bgDark: '#0F1E23',
+    bg: '#E8F4F8',
+    text: '#1F3A47',
     description: 'Calm & soothing'
   },
 ];
@@ -359,26 +359,71 @@ function FileTreeItem({
   );
 }
 
+// 从 localStorage 加载保存的状态
+const loadSavedState = (key, defaultValue) => {
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved !== null) {
+      return JSON.parse(saved);
+    }
+  } catch (error) {
+    console.error(`加载状态失败 (${key}):`, error);
+  }
+  return defaultValue;
+};
+
+// 保存状态到 localStorage
+const saveState = (key, value) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.error(`保存状态失败 (${key}):`, error);
+  }
+};
+
 function App() {
+  // 调试：检查 Tauri 环境
+  useEffect(() => {
+    console.log('🔍 JustMark 调试信息:');
+    console.log('  - 是否在 Tauri 环境:', window.__TAURI__ !== undefined);
+    console.log('  - User Agent:', navigator.userAgent);
+    console.log('  - Platform:', navigator.platform);
+
+    // 测试拖动区域
+    const header = document.querySelector('header[data-tauri-drag-region]');
+    if (header) {
+      const style = window.getComputedStyle(header);
+      console.log('  - Header 拖动样式:', {
+        webkitAppRegion: style.webkitAppRegion || style['-webkit-app-region'],
+        appRegion: style.appRegion
+      });
+    }
+  }, []);
+
   const [markdown, setMarkdown] = useState("### JustMark\n Write in a single way...");
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [fontIndex, setFontIndex] = useState(0);
-  const [fontFamilyIndex, setFontFamilyIndex] = useState(1); // 默认使用 Georgia (衬线字体)
-  const [bgColorIndex, setBgColorIndex] = useState(0);
+  const [isDarkMode, setIsDarkMode] = useState(() => loadSavedState('isDarkMode', false));
+  const [fontIndex, setFontIndex] = useState(() => loadSavedState('fontIndex', 0));
+  const [fontFamilyIndex, setFontFamilyIndex] = useState(() => loadSavedState('fontFamilyIndex', 1));
+  const [bgColorIndex, setBgColorIndex] = useState(() => loadSavedState('bgColorIndex', 0));
+  const [previewBgColorIndex, setPreviewBgColorIndex] = useState(() => loadSavedState('previewBgColorIndex', null)); // null 表示使用主题颜色
+  const [showPreviewBgColorMenu, setShowPreviewBgColorMenu] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [currentFilePath, setCurrentFilePath] = useState(null);
+  const [currentFilePath, setCurrentFilePath] = useState(() => loadSavedState('currentFilePath', null));
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showFontMenu, setShowFontMenu] = useState(false);
   const [showBgColorMenu, setShowBgColorMenu] = useState(false);
   const [showOpenMenu, setShowOpenMenu] = useState(false);
-  const [previewMode, setPreviewMode] = useState('markdown'); // 'markdown' or 'pdf'
+  const [previewMode, setPreviewMode] = useState(() => loadSavedState('previewMode', 'markdown'));
   const [showIndicator, setShowIndicator] = useState(true);
   const [showBgColorWarning, setShowBgColorWarning] = useState(false);
-  const [sidebarVisible, setSidebarVisible] = useState(false);
-  const [sidebarView, setSidebarView] = useState('files'); // 'files' or 'git'
-  const [currentFolder, setCurrentFolder] = useState(null);
+  const [sidebarVisible, setSidebarVisible] = useState(() => loadSavedState('sidebarVisible', false));
+  const [sidebarView, setSidebarView] = useState(() => loadSavedState('sidebarView', 'files'));
+  const [currentFolder, setCurrentFolder] = useState(() => loadSavedState('currentFolder', null));
   const [folderContents, setFolderContents] = useState([]);
-  const [expandedFolders, setExpandedFolders] = useState(new Set());
+  const [expandedFolders, setExpandedFolders] = useState(() => {
+    const saved = loadSavedState('expandedFolders', []);
+    return new Set(saved);
+  });
   const indicatorTimeoutRef = useRef(null);
   const warningTimeoutRef = useRef(null);
 
@@ -389,8 +434,8 @@ function App() {
   const pdfContainerRef = useRef(null);
 
   // 可调整面板宽度
-  const [sidebarWidth, setSidebarWidth] = useState(224); // 默认 14rem = 224px (w-56)
-  const [editorWidth, setEditorWidth] = useState(50); // 编辑器占比 50%
+  const [sidebarWidth, setSidebarWidth] = useState(() => loadSavedState('sidebarWidth', 224));
+  const [editorWidth, setEditorWidth] = useState(() => loadSavedState('editorWidth', 50));
   const [isDraggingSidebar, setIsDraggingSidebar] = useState(false);
   const [isDraggingEditor, setIsDraggingEditor] = useState(false);
 
@@ -400,6 +445,64 @@ function App() {
   const newMenuRef = useRef(null);
   const [inlineCreate, setInlineCreate] = useState(null); // { parentPath: string, type: 'file'|'folder', value: string }
   const inlineCreateInputRef = useRef(null);
+
+  // 保存状态到 localStorage
+  useEffect(() => {
+    saveState('isDarkMode', isDarkMode);
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    saveState('fontIndex', fontIndex);
+  }, [fontIndex]);
+
+  useEffect(() => {
+    saveState('fontFamilyIndex', fontFamilyIndex);
+  }, [fontFamilyIndex]);
+
+  useEffect(() => {
+    saveState('bgColorIndex', bgColorIndex);
+    // 切换主题时，重置预览区颜色为主题颜色
+    setPreviewBgColorIndex(null);
+  }, [bgColorIndex]);
+
+  useEffect(() => {
+    saveState('previewBgColorIndex', previewBgColorIndex);
+  }, [previewBgColorIndex]);
+
+  useEffect(() => {
+    saveState('currentFilePath', currentFilePath);
+  }, [currentFilePath]);
+
+  useEffect(() => {
+    saveState('previewMode', previewMode);
+  }, [previewMode]);
+
+  useEffect(() => {
+    saveState('sidebarVisible', sidebarVisible);
+  }, [sidebarVisible]);
+
+  useEffect(() => {
+    saveState('sidebarView', sidebarView);
+  }, [sidebarView]);
+
+  useEffect(() => {
+    saveState('currentFolder', currentFolder);
+  }, [currentFolder]);
+
+  useEffect(() => {
+    saveState('expandedFolders', Array.from(expandedFolders));
+  }, [expandedFolders]);
+
+  useEffect(() => {
+    saveState('sidebarWidth', sidebarWidth);
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    saveState('editorWidth', editorWidth);
+  }, [editorWidth]);
+
+  // 定义 loadFolderContents 函数需要在这里之前声明，所以我们移除这个 useEffect
+  // 恢复逻辑将在 loadFolderContents 定义之后添加
 
   const toggleTheme = () => {
     // 使用 requestAnimationFrame 优化主题切换性能
@@ -445,23 +548,54 @@ function App() {
   useEffect(() => {
     if (!isDraggingSidebar) return;
 
+    // 防止拖动时选中文本和闪动
+    document.body.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+
+    let animationFrameId = null;
+
     const handleMouseMove = (e) => {
-      const newWidth = e.clientX;
-      if (newWidth >= 150 && newWidth <= 400) {
-        setSidebarWidth(newWidth);
+      e.preventDefault();
+      e.stopPropagation();
+
+      // 使用 requestAnimationFrame 优化性能
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
       }
+
+      animationFrameId = requestAnimationFrame(() => {
+        const newWidth = e.clientX;
+        if (newWidth >= 150 && newWidth <= 400) {
+          setSidebarWidth(newWidth);
+        }
+      });
     };
 
     const handleMouseUp = () => {
       setIsDraggingSidebar(false);
+      document.body.classList.remove('dragging');
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mousemove', handleMouseMove, { passive: false });
     document.addEventListener('mouseup', handleMouseUp);
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.body.classList.remove('dragging');
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
     };
   }, [isDraggingSidebar]);
 
@@ -469,28 +603,59 @@ function App() {
   useEffect(() => {
     if (!isDraggingEditor) return;
 
+    // 防止拖动时选中文本和闪动
+    document.body.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+
+    let animationFrameId = null;
+
     const handleMouseMove = (e) => {
-      const container = document.querySelector('main');
-      if (!container) return;
+      e.preventDefault();
+      e.stopPropagation();
 
-      const rect = container.getBoundingClientRect();
-      const newPercent = ((e.clientX - rect.left) / rect.width) * 100;
-
-      if (newPercent >= 20 && newPercent <= 80) {
-        setEditorWidth(newPercent);
+      // 使用 requestAnimationFrame 优化性能
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
       }
+
+      animationFrameId = requestAnimationFrame(() => {
+        const container = document.querySelector('main');
+        if (!container) return;
+
+        const rect = container.getBoundingClientRect();
+        const newPercent = ((e.clientX - rect.left) / rect.width) * 100;
+
+        if (newPercent >= 20 && newPercent <= 80) {
+          setEditorWidth(newPercent);
+        }
+      });
     };
 
     const handleMouseUp = () => {
       setIsDraggingEditor(false);
+      document.body.classList.remove('dragging');
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mousemove', handleMouseMove, { passive: false });
     document.addEventListener('mouseup', handleMouseUp);
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.body.classList.remove('dragging');
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
     };
   }, [isDraggingEditor]);
 
@@ -570,6 +735,65 @@ function App() {
     }
   }, [inlineCreate?.parentPath, inlineCreate?.type]);
 
+  // 监听点击其他区域取消内联创建
+  useEffect(() => {
+    if (!inlineCreate) return;
+
+    const handleClickOutside = (e) => {
+      // 如果点击的是输入框或其父元素，不取消
+      if (inlineCreateInputRef.current &&
+          (e.target === inlineCreateInputRef.current ||
+           inlineCreateInputRef.current.contains(e.target))) {
+        return;
+      }
+
+      // 检查是否点击在以下任意区域，都应该取消创建：
+      // 1. 侧边栏内（但不是输入框）
+      const sidebarElement = document.querySelector('.flex-1.overflow-y-auto.overflow-x-hidden.py-1');
+      if (sidebarElement && sidebarElement.contains(e.target)) {
+        cancelInlineCreate();
+        return;
+      }
+
+      // 2. 编辑器文本区域
+      const editorElement = document.querySelector('textarea');
+      if (editorElement && (e.target === editorElement || editorElement.contains(e.target))) {
+        cancelInlineCreate();
+        return;
+      }
+
+      // 3. 预览区域（包括 Markdown 和 PDF 模式）
+      const previewSections = document.querySelectorAll('main > section');
+      for (const section of previewSections) {
+        if (section.contains(e.target)) {
+          // 检查是否是预览区（不包含侧边栏的 section）
+          const hasSidebar = section.querySelector('.flex-1.overflow-y-auto.overflow-x-hidden.py-1');
+          if (!hasSidebar) {
+            cancelInlineCreate();
+            return;
+          }
+        }
+      }
+
+      // 4. 工具栏区域
+      const headerElement = document.querySelector('header');
+      if (headerElement && headerElement.contains(e.target)) {
+        cancelInlineCreate();
+        return;
+      }
+    };
+
+    // 延迟添加监听器，避免立即触发
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [inlineCreate]);
+
   // 键盘快捷键处理
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -614,6 +838,10 @@ function App() {
   const handleBgColorChange = (index) => {
     setBgColorIndex(index);
     setShowBgColorMenu(false);
+    // 如果当前是黑暗模式，切换主题颜色时自动退出黑暗模式
+    if (isDarkMode) {
+      setIsDarkMode(false);
+    }
   };
 
   // 处理背景色按钮点击
@@ -1176,11 +1404,17 @@ function App() {
   const currentFont = FONT_OPTIONS[fontIndex];
   const currentFontFamily = FONT_FAMILIES[fontFamilyIndex];
   const currentBgColor = BACKGROUND_COLORS[bgColorIndex];
-  const isPaperWhite = currentBgColor.name === 'Paper White';
-  const previewBgColor = isDarkMode && isPaperWhite
-    ? currentBgColor.bgLight
-    : (isDarkMode ? currentBgColor.bgDark : currentBgColor.bgLight);
-  const shouldInvertPreview = isDarkMode && !isPaperWhite;
+
+  // 应用颜色逻辑：
+  // 1. 黑暗模式优先：如果开启黑暗模式，使用纯黑背景
+  // 2. 否则使用主题颜色（浅色版本）
+  const appBgColor = isDarkMode ? '#1A1A1A' : currentBgColor.bg;
+  const appTextColor = isDarkMode ? '#E5E7EB' : currentBgColor.text;
+
+  // 预览区颜色：如果设置了独立的预览区颜色，使用独立颜色；否则使用应用颜色
+  const previewColor = previewBgColorIndex !== null ? BACKGROUND_COLORS[previewBgColorIndex] : null;
+  const previewBgColor = previewColor ? previewColor.bg : appBgColor;
+  const previewTextColor = previewColor ? previewColor.text : appTextColor;
 
   // 使用 useMemo 缓存 markdown 渲染内容，避免主题切换时重新渲染
   const renderedMarkdown = useMemo(() => (
@@ -1189,8 +1423,79 @@ function App() {
     </ReactMarkdown>
   ), [markdown]);
 
+  // 应用启动时恢复上次打开的文件和文件夹
+  useEffect(() => {
+    const restoreLastSession = async () => {
+      const savedFilePath = loadSavedState('currentFilePath', null);
+      const savedFolder = loadSavedState('currentFolder', null);
+      const savedExpandedFolders = loadSavedState('expandedFolders', []);
+      const savedSidebarVisible = loadSavedState('sidebarVisible', false);
+
+      console.log('🔄 恢复会话:', {
+        savedFolder,
+        savedFilePath,
+        savedExpandedFolders,
+        savedSidebarVisible
+      });
+
+      // 如果有保存的文件夹，加载文件夹内容并显示侧边栏
+      if (savedFolder) {
+        try {
+          // 确保侧边栏可见
+          if (savedSidebarVisible) {
+            setSidebarVisible(true);
+          }
+
+          // 先加载文件夹内容
+          await loadFolderContents(savedFolder);
+          console.log('✅ 文件夹内容已加载');
+
+          // 然后恢复展开的文件夹状态
+          if (savedExpandedFolders && savedExpandedFolders.length > 0) {
+            console.log('📂 恢复展开的文件夹:', savedExpandedFolders);
+            // 使用 setTimeout 确保状态更新在下一个事件循环
+            setTimeout(() => {
+              setExpandedFolders(new Set(savedExpandedFolders));
+            }, 50);
+          }
+        } catch (error) {
+          console.error('❌ 无法恢复文件夹:', error);
+          saveState('currentFolder', null);
+        }
+      }
+
+      // 如果有保存的文件，尝试加载
+      if (savedFilePath) {
+        try {
+          const content = await readTextFile(savedFilePath);
+          setMarkdown(content);
+          setHasUnsavedChanges(false);
+          console.log('✅ 成功恢复文件:', savedFilePath);
+        } catch (error) {
+          console.error('❌ 无法恢复文件:', error);
+          // 文件不存在或无法读取，清除保存的路径
+          saveState('currentFilePath', null);
+          setCurrentFilePath(null);
+        }
+      }
+    };
+
+    // 延迟执行，确保组件完全挂载
+    const timer = setTimeout(() => {
+      restoreLastSession();
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, []); // 空依赖数组，只在组件挂载时运行一次
+
   return (
-    <div className={`${isDarkMode ? 'dark' : ''} h-screen w-screen flex flex-col transition-colors duration-300`}>
+    <div
+      className={`${isDarkMode ? 'dark' : ''} h-screen w-screen flex flex-col transition-colors duration-300`}
+      style={{
+        backgroundColor: appBgColor,
+        color: appTextColor
+      }}
+    >
       
       {/* 添加打印样式和 macOS 风格动画 */}
       <style>{`
@@ -1269,12 +1574,92 @@ function App() {
         .dark {
           color-scheme: dark;
         }
+
+        /* 防止拖动时的闪动 */
+        section {
+          will-change: width;
+        }
+
+        section > * {
+          pointer-events: auto;
+        }
+
+        /* 拖动时禁用所有交互和选择 */
+        body.dragging,
+        body.dragging * {
+          user-select: none !important;
+          -webkit-user-select: none !important;
+          -moz-user-select: none !important;
+          -ms-user-select: none !important;
+          pointer-events: none !important;
+          cursor: col-resize !important;
+        }
+
+        /* 只允许关键元素保持可交互 */
+        body.dragging section,
+        body.dragging textarea,
+        body.dragging .custom-scrollbar {
+          pointer-events: auto !important;
+        }
+
+        /* 防止 iframe 和其他嵌入内容干扰拖动 */
+        body.dragging iframe,
+        body.dragging object,
+        body.dragging embed {
+          pointer-events: none !important;
+        }
+
+        /* 拖动时禁用过渡效果，减少闪烁 */
+        body.dragging section,
+        body.dragging textarea,
+        body.dragging .prose,
+        body.dragging #print-target {
+          transition: none !important;
+        }
+
+        /* 窗口拖动区域样式 - 明确指定 header 区域可拖动 */
+        header[data-tauri-drag-region],
+        header [data-tauri-drag-region] {
+          -webkit-app-region: drag !important;
+          app-region: drag !important;
+        }
+
+        /* 确保按钮、输入框和其他交互元素不受拖动影响 */
+        header button,
+        header input,
+        header textarea,
+        header select,
+        header a,
+        header .relative,
+        header [role="button"] {
+          -webkit-app-region: no-drag !important;
+          app-region: no-drag !important;
+        }
+
+        /* 禁止工具栏中所有文字被选中 */
+        header,
+        header *,
+        header span,
+        header button,
+        header div {
+          user-select: none !important;
+          -webkit-user-select: none !important;
+          -moz-user-select: none !important;
+          -ms-user-select: none !important;
+        }
       `}</style>
       
       {/* === 工具栏 === */}
-      <header className={`${HEADER_HEIGHT} flex-none z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 transition-colors duration-300`}>
-        
-        <div className="h-full flex items-center justify-between px-4">
+      <header
+        className={`${HEADER_HEIGHT} flex-none z-50 border-b transition-colors duration-300`}
+        style={{
+          backgroundColor: appBgColor,
+          borderBottomColor: 'rgba(0, 0, 0, 0.1)'
+        }}
+        data-tauri-drag-region
+      >
+
+        <div className="h-full flex items-center justify-between px-4" data-tauri-drag-region>
 
           {/* 左侧：macOS窗口控制区域占位 + 文件操作按钮 */}
           <div className="flex items-center gap-0.5">
@@ -1362,15 +1747,16 @@ function App() {
             </button>
           </div>
 
-          {/* 中间：应用名称 */}
-          <div className="flex-1 flex items-center justify-center">
+          {/* 中间：应用名称 - 可拖动区域 */}
+          <div className="flex-1 flex items-center justify-center" data-tauri-drag-region>
             <span
+              data-tauri-drag-region
               style={{
                 fontFamily: 'Georgia, "Times New Roman", serif',
                 fontSize: '14px',
                 fontWeight: '300',
                 letterSpacing: '0.15em',
-                color: isDarkMode ? '#e5e7eb' : '#374151'
+                color: appTextColor
               }}
             >
               JustMark
@@ -1458,10 +1844,7 @@ function App() {
                       <div
                         className="w-5 h-5 rounded border border-gray-300 dark:border-gray-600 flex-shrink-0"
                         style={{
-                          backgroundColor:
-                            isDarkMode && color.name === 'Paper White'
-                              ? color.bgLight
-                              : (isDarkMode ? color.bgDark : color.bgLight)
+                          backgroundColor: color.bg
                         }}
                       ></div>
                       <div>
@@ -1518,22 +1901,39 @@ function App() {
 
         {/* 左侧：输入区 + 文件浏览器 + Git 面板 */}
         <section
-          className="h-full border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 transition-colors duration-300 relative flex"
-          style={{ width: `${editorWidth}%` }}
+          className="h-full border-r transition-colors duration-300 relative flex"
+          style={{
+            width: `${editorWidth}%`,
+            backgroundColor: appBgColor,
+            borderRightColor: 'rgba(0, 0, 0, 0.1)'
+          }}
         >
           {/* 侧边栏 - macOS 风格 */}
           {sidebarVisible && currentFolder && (
             <>
               <div
-                className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-700/50 flex flex-col"
-                style={{ width: `${sidebarWidth}px` }}
+                className="backdrop-blur-xl border-r flex flex-col"
+                style={{
+                  width: `${sidebarWidth}px`,
+                  backgroundColor: `${appBgColor}f2`, // 95% opacity
+                  borderRightColor: 'rgba(0, 0, 0, 0.1)'
+                }}
               >
               {sidebarView === 'files' ? (
                 <>
                   {/* 文件浏览器头部 */}
-                  <div className="h-10 px-3 flex items-center justify-between border-b border-gray-200/80 dark:border-gray-700/80 bg-gradient-to-b from-gray-50/80 to-white/60 dark:from-gray-800/80 dark:to-gray-900/60 flex-shrink-0">
+                  <div
+                    className="h-10 px-3 flex items-center justify-between border-b flex-shrink-0"
+                    style={{
+                      borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+                      backgroundColor: appBgColor
+                    }}
+                  >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 truncate">
+                      <span
+                        className="text-[11px] font-semibold truncate"
+                        style={{ color: appTextColor }}
+                      >
                         {currentFolder.split('/').pop() || 'Files'}
                       </span>
                     </div>
@@ -1596,16 +1996,18 @@ function App() {
                   onDiscardChanges={git.discardChanges}
                   onGetLog={git.getLog}
                   onClose={() => setSidebarVisible(false)}
+                  appBgColor={appBgColor}
+                  appTextColor={appTextColor}
                 />
               )}
             </div>
 
             {/* 侧边栏拖动条 */}
             <div
-              className="w-1 bg-gray-200/70 dark:bg-gray-700/70 hover:bg-gray-300/60 dark:hover:bg-gray-600/60 cursor-col-resize active:bg-gray-300 dark:active:bg-gray-600 transition-colors relative group"
+              className="w-px bg-gray-200/50 dark:bg-gray-700/50 hover:bg-gray-300/70 dark:hover:bg-gray-600/70 cursor-col-resize active:bg-blue-400/70 dark:active:bg-blue-500/70 transition-colors relative group"
               onMouseDown={() => setIsDraggingSidebar(true)}
             >
-              <div className="absolute inset-y-0 -left-1 -right-1" />
+              <div className="absolute inset-y-0 -left-2 -right-2" />
             </div>
           </>
           )}
@@ -1613,9 +2015,10 @@ function App() {
           {/* 编辑器文本区域 */}
           <div className="flex-1 relative flex flex-col">
             <textarea
-              className={`flex-1 p-6 outline-none resize-none text-gray-700 dark:text-gray-300 bg-transparent placeholder-gray-300 dark:placeholder-gray-600 ${currentFont.size} ${currentFont.leading}`}
+              className={`flex-1 p-6 outline-none resize-none bg-transparent placeholder-gray-300 dark:placeholder-gray-600 ${currentFont.size} ${currentFont.leading}`}
               style={{
-                fontFamily: currentFontFamily.family
+                fontFamily: currentFontFamily.family,
+                color: appTextColor
               }}
               value={markdown}
               onChange={handleMarkdownChange}
@@ -1684,10 +2087,10 @@ function App() {
 
         {/* 编辑器和预览区之间的分隔符 */}
         <div
-          className="w-1 bg-gray-200/70 dark:bg-gray-700/70 hover:bg-gray-300/60 dark:hover:bg-gray-600/60 cursor-col-resize active:bg-gray-300 dark:active:bg-gray-600 transition-colors relative group"
+          className="w-px bg-gray-200/50 dark:bg-gray-700/50 hover:bg-gray-300/70 dark:hover:bg-gray-600/70 cursor-col-resize active:bg-blue-400/70 dark:active:bg-blue-500/70 transition-colors relative group"
           onMouseDown={() => setIsDraggingEditor(true)}
         >
-          <div className="absolute inset-y-0 -left-1 -right-1" />
+          <div className="absolute inset-y-0 -left-2 -right-2" />
         </div>
 
         {/* 右侧：预览区 */}
@@ -1709,14 +2112,92 @@ function App() {
             </div>
           )}
 
+          {/* 预览区颜色选择按钮 - 仅在 Markdown 模式下显示 */}
+          {previewMode === 'markdown' && (
+            <div className="absolute top-16 right-4 z-10">
+              <div className="relative">
+                <button
+                  onClick={() => setShowPreviewBgColorMenu(!showPreviewBgColorMenu)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-lg border border-gray-200/50 dark:border-gray-700/50 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all active:scale-95"
+                  title="预览区颜色"
+                >
+                  <div
+                    className="w-4 h-4 rounded-full border-2 border-white dark:border-gray-600"
+                    style={{ backgroundColor: previewBgColor }}
+                  ></div>
+                </button>
+
+                {/* 预览区颜色选项菜单 */}
+                {showPreviewBgColorMenu && (
+                  <div className="absolute right-0 top-10 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 rounded-lg shadow-xl z-50 overflow-hidden">
+                    {/* 重置为主题颜色选项 */}
+                    <button
+                      onClick={() => {
+                        setPreviewBgColorIndex(null);
+                        setShowPreviewBgColorMenu(false);
+                      }}
+                      className={`w-full px-3 py-2 text-left text-xs hover:bg-gray-100/80 dark:hover:bg-gray-700/80 transition-colors flex items-center gap-2 ${
+                        previewBgColorIndex === null ? 'bg-gray-100/80 dark:bg-gray-700/80' : ''
+                      }`}
+                    >
+                      <div className="w-5 h-5 rounded border border-gray-300 dark:border-gray-600 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs">↺</span>
+                      </div>
+                      <div>
+                        <div className="font-medium text-gray-900 dark:text-gray-100">
+                          使用主题颜色
+                        </div>
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                          跟随当前主题
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* 分隔线 */}
+                    <div className="border-t border-gray-200/50 dark:border-gray-700/50 my-1"></div>
+
+                    {/* 颜色选项 */}
+                    {BACKGROUND_COLORS.map((color, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          setPreviewBgColorIndex(index);
+                          setShowPreviewBgColorMenu(false);
+                        }}
+                        className={`w-full px-3 py-2 text-left text-xs hover:bg-gray-100/80 dark:hover:bg-gray-700/80 transition-colors flex items-center gap-2 ${
+                          previewBgColorIndex === index ? 'bg-gray-100/80 dark:bg-gray-700/80' : ''
+                        }`}
+                      >
+                        <div
+                          className="w-5 h-5 rounded border border-gray-300 dark:border-gray-600 flex-shrink-0"
+                          style={{
+                            backgroundColor: color.bg
+                          }}
+                        ></div>
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-gray-100">
+                            {color.name}
+                          </div>
+                          <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                            {color.description}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {previewMode === 'markdown' ? (
             /* Markdown 预览模式 - 正常网页效果 */
             <div className="w-full max-w-4xl p-6">
               <article
-                className={`prose max-w-none prose-headings:font-semibold ${shouldInvertPreview ? 'dark:prose-invert' : ''}`}
-                style={{ 
+                className="prose max-w-none prose-headings:font-semibold"
+                style={{
                   fontFamily: currentFontFamily.family,
-                  color: shouldInvertPreview ? undefined : '#111827'
+                  color: previewTextColor
                 }}
               >
                 <style>{`
