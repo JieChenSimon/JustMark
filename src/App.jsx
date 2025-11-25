@@ -3,13 +3,15 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile, writeFile, readTextFile, readDir, remove, mkdir } from '@tauri-apps/plugin-fs';
-import 'katex/dist/katex.min.css';
 import { useGit } from './hooks/useGit';
 import { GitPanel } from './components/GitPanel';
+import PreviewColorPicker from './components/PreviewColorPicker';
+import EditorArea from './components/EditorArea';
 
 // ==============================================
 // 🛠️ 核心配置
@@ -432,6 +434,37 @@ function App() {
   const [gitPanelVisible, setGitPanelVisible] = useState(false);
   const [pdfScale, setPdfScale] = useState(1);
   const pdfContainerRef = useRef(null);
+  const previewSectionRef = useRef(null);
+  const editorAreaRef = useRef(null);
+
+  // 处理编辑器滚动同步到预览区
+  const handleEditorScroll = (scrollPercentage) => {
+    if (previewSectionRef.current && !isNaN(scrollPercentage)) {
+      const preview = previewSectionRef.current;
+      const maxScroll = preview.scrollHeight - preview.clientHeight;
+      preview.scrollTo({
+        top: maxScroll * scrollPercentage,
+        behavior: 'auto'
+      });
+    }
+  };
+
+  // 处理预览区点击跳转到编辑器
+  const handlePreviewClickToJump = (e) => {
+    // 只在 Markdown 模式下处理
+    if (previewMode !== 'markdown' || !previewSectionRef.current || !editorAreaRef.current) {
+      return;
+    }
+
+    // 计算点击位置在预览区的相对位置
+    const preview = previewSectionRef.current;
+    const scrollPercentage = preview.scrollTop / (preview.scrollHeight - preview.clientHeight);
+
+    // 让编辑器滚动到对应位置
+    if (editorAreaRef.current.scrollToPercentage) {
+      editorAreaRef.current.scrollToPercentage(scrollPercentage);
+    }
+  };
 
   // 可调整面板宽度
   const [sidebarWidth, setSidebarWidth] = useState(() => loadSavedState('sidebarWidth', 224));
@@ -1418,7 +1451,15 @@ function App() {
 
   // 使用 useMemo 缓存 markdown 渲染内容，避免主题切换时重新渲染
   const renderedMarkdown = useMemo(() => (
-    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+    <ReactMarkdown
+      remarkPlugins={[
+        [remarkMath, {
+          singleDollarTextMath: false
+        }],
+        remarkGfm
+      ]}
+      rehypePlugins={[rehypeKatex]}
+    >
       {markdown}
     </ReactMarkdown>
   ), [markdown]);
@@ -2013,76 +2054,22 @@ function App() {
           )}
 
           {/* 编辑器文本区域 */}
-          <div className="flex-1 relative flex flex-col">
-            <textarea
-              className={`flex-1 p-6 outline-none resize-none bg-transparent placeholder-gray-300 dark:placeholder-gray-600 ${currentFont.size} ${currentFont.leading}`}
-              style={{
-                fontFamily: currentFontFamily.family,
-                color: appTextColor
-              }}
-              value={markdown}
-              onChange={handleMarkdownChange}
-              placeholder="JustMark..."
-              spellCheck="false"
-            />
-
-            {/* 左下角：侧边栏导航按钮和文件名 */}
-            <div className="absolute bottom-4 left-4 flex items-end gap-2 z-20">
-              {/* 侧边栏导航按钮组 - 只在有文件夹时显示 */}
-              {currentFolder && (
-                <div className="flex flex-col gap-1">
-                  {/* Git 源代码管理按钮 */}
-                  <button
-                    onClick={() => {
-                      setSidebarView('git');
-                      setSidebarVisible(true);
-                    }}
-                    className={`w-8 h-8 flex items-center justify-center rounded-lg backdrop-blur-sm shadow-md transition-all active:scale-95 relative ${
-                      sidebarVisible && sidebarView === 'git'
-                        ? 'bg-blue-500/20 dark:bg-blue-500/30 border border-blue-400/50 dark:border-blue-400/50'
-                        : 'bg-gray-100/80 dark:bg-gray-800/80 hover:bg-gray-200/90 dark:hover:bg-gray-700/90 border border-gray-300/50 dark:border-gray-600/50'
-                    }`}
-                    title="源代码管理"
-                  >
-                    <svg className={`w-4 h-4 ${sidebarVisible && sidebarView === 'git' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                    </svg>
-                    {/* 更改数量徽章 */}
-                    {git.status?.hasChanges && (
-                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-md">
-                        {git.status.files?.length > 9 ? '9+' : git.status.files?.length}
-                      </span>
-                    )}
-                  </button>
-
-                  {/* 文件浏览器按钮 */}
-                  <button
-                    onClick={() => {
-                      setSidebarView('files');
-                      setSidebarVisible(!sidebarVisible);
-                    }}
-                    className={`w-8 h-8 flex items-center justify-center rounded-lg backdrop-blur-sm shadow-md transition-all active:scale-95 ${
-                      sidebarVisible && sidebarView === 'files'
-                        ? 'bg-blue-500/20 dark:bg-blue-500/30 border border-blue-400/50 dark:border-blue-400/50'
-                        : 'bg-gray-100/80 dark:bg-gray-800/80 hover:bg-gray-200/90 dark:hover:bg-gray-700/90 border border-gray-300/50 dark:border-gray-600/50'
-                    }`}
-                    title={sidebarVisible && sidebarView === 'files' ? '隐藏目录' : '显示目录'}
-                  >
-                    <svg className={`w-4 h-4 ${sidebarVisible && sidebarView === 'files' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-
-              {/* 文件名显示 */}
-              {currentFilePath && (
-                <span className="px-2.5 py-1 text-[10px] text-gray-500 dark:text-gray-400 bg-gray-100/80 dark:bg-gray-800/80 rounded-lg border border-gray-300/50 dark:border-gray-600/50 backdrop-blur-sm shadow-sm mb-0.5">
-                  {currentFilePath.split('/').pop()}
-                </span>
-              )}
-            </div>
-          </div>
+          <EditorArea
+            ref={editorAreaRef}
+            markdown={markdown}
+            onMarkdownChange={handleMarkdownChange}
+            currentFont={currentFont}
+            currentFontFamily={currentFontFamily}
+            appTextColor={appTextColor}
+            currentFolder={currentFolder}
+            currentFilePath={currentFilePath}
+            sidebarVisible={sidebarVisible}
+            sidebarView={sidebarView}
+            onToggleSidebar={setSidebarVisible}
+            onSetSidebarView={setSidebarView}
+            gitStatus={git.status}
+            onEditorScroll={handleEditorScroll}
+          />
         </section>
 
         {/* 编辑器和预览区之间的分隔符 */}
@@ -2095,7 +2082,10 @@ function App() {
 
         {/* 右侧：预览区 */}
         <section
-          ref={pdfContainerRef}
+          ref={(el) => {
+            pdfContainerRef.current = el;
+            previewSectionRef.current = el;
+          }}
           className="flex-1 h-full overflow-y-auto flex justify-center transition-colors duration-300 relative"
           style={{ backgroundColor: previewBgColor }}
           onClick={handlePreviewClick}
@@ -2114,80 +2104,20 @@ function App() {
 
           {/* 预览区颜色选择按钮 - 仅在 Markdown 模式下显示 */}
           {previewMode === 'markdown' && (
-            <div className="absolute bottom-6 right-6 z-10">
-              <div className="relative">
-                <button
-                  onClick={() => setShowPreviewBgColorMenu(!showPreviewBgColorMenu)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-lg border border-gray-200/50 dark:border-gray-700/50 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all active:scale-95"
-                  title="预览区颜色"
-                >
-                  <div
-                    className="w-4 h-4 rounded-full border-2 border-white dark:border-gray-600"
-                    style={{ backgroundColor: previewBgColor }}
-                  ></div>
-                </button>
-
-                {/* 预览区颜色选项菜单 */}
-                {showPreviewBgColorMenu && (
-                  <div className="absolute right-0 bottom-10 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 rounded-lg shadow-xl z-50 overflow-hidden">
-                    {/* 重置为主题颜色选项 */}
-                    <button
-                      onClick={() => {
-                        setPreviewBgColorIndex(null);
-                        setShowPreviewBgColorMenu(false);
-                      }}
-                      className={`w-full px-3 py-2 text-left text-xs hover:bg-gray-100/80 dark:hover:bg-gray-700/80 transition-colors flex items-center gap-2 ${
-                        previewBgColorIndex === null ? 'bg-gray-100/80 dark:bg-gray-700/80' : ''
-                      }`}
-                    >
-                      <div className="w-5 h-5 rounded border border-gray-300 dark:border-gray-600 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs">↺</span>
-                      </div>
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-gray-100">
-                          使用主题颜色
-                        </div>
-                        <div className="text-[10px] text-gray-500 dark:text-gray-400">
-                          跟随当前主题
-                        </div>
-                      </div>
-                    </button>
-
-                    {/* 分隔线 */}
-                    <div className="border-t border-gray-200/50 dark:border-gray-700/50 my-1"></div>
-
-                    {/* 颜色选项 */}
-                    {BACKGROUND_COLORS.map((color, index) => (
-                      <button
-                        key={index}
-                        onClick={() => {
-                          setPreviewBgColorIndex(index);
-                          setShowPreviewBgColorMenu(false);
-                        }}
-                        className={`w-full px-3 py-2 text-left text-xs hover:bg-gray-100/80 dark:hover:bg-gray-700/80 transition-colors flex items-center gap-2 ${
-                          previewBgColorIndex === index ? 'bg-gray-100/80 dark:bg-gray-700/80' : ''
-                        }`}
-                      >
-                        <div
-                          className="w-5 h-5 rounded border border-gray-300 dark:border-gray-600 flex-shrink-0"
-                          style={{
-                            backgroundColor: color.bg
-                          }}
-                        ></div>
-                        <div>
-                          <div className="font-medium text-gray-900 dark:text-gray-100">
-                            {color.name}
-                          </div>
-                          <div className="text-[10px] text-gray-500 dark:text-gray-400">
-                            {color.description}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <PreviewColorPicker
+              previewBgColor={previewBgColor}
+              previewBgColorIndex={previewBgColorIndex}
+              showMenu={showPreviewBgColorMenu}
+              onToggleMenu={() => setShowPreviewBgColorMenu(!showPreviewBgColorMenu)}
+              onColorSelect={(index) => {
+                setPreviewBgColorIndex(index);
+                setShowPreviewBgColorMenu(false);
+              }}
+              onReset={() => {
+                setPreviewBgColorIndex(null);
+                setShowPreviewBgColorMenu(false);
+              }}
+            />
           )}
 
           {previewMode === 'markdown' ? (
@@ -2214,18 +2144,36 @@ function App() {
                     line-height: 1.2 !important;
                     margin-top: ${currentFont.leading === 'leading-6' ? '1rem' : currentFont.leading === 'leading-7' ? '1.25rem' : '1.5rem'} !important;
                     margin-bottom: ${currentFont.leading === 'leading-6' ? '0.5rem' : currentFont.leading === 'leading-7' ? '0.625rem' : '0.75rem'} !important;
+                    color: inherit !important;
                   }
                   .prose h2 {
                     font-size: ${currentFont.size === 'text-sm' ? '1.25rem' : currentFont.size === 'text-base' ? '1.5rem' : '1.875rem'} !important;
                     line-height: 1.2 !important;
                     margin-top: ${currentFont.leading === 'leading-6' ? '0.875rem' : currentFont.leading === 'leading-7' ? '1rem' : '1.25rem'} !important;
                     margin-bottom: ${currentFont.leading === 'leading-6' ? '0.5rem' : currentFont.leading === 'leading-7' ? '0.625rem' : '0.75rem'} !important;
+                    color: inherit !important;
                   }
                   .prose h3 {
                     font-size: ${currentFont.size === 'text-sm' ? '1.125rem' : currentFont.size === 'text-base' ? '1.25rem' : '1.5rem'} !important;
                     line-height: 1.2 !important;
                     margin-top: ${currentFont.leading === 'leading-6' ? '0.75rem' : currentFont.leading === 'leading-7' ? '0.875rem' : '1rem'} !important;
                     margin-bottom: ${currentFont.leading === 'leading-6' ? '0.375rem' : currentFont.leading === 'leading-7' ? '0.5rem' : '0.625rem'} !important;
+                    color: inherit !important;
+                  }
+                  .prose h4, .prose h5, .prose h6 {
+                    color: inherit !important;
+                  }
+                  .prose strong, .prose b {
+                    color: inherit !important;
+                  }
+                  .prose em, .prose i {
+                    color: inherit !important;
+                  }
+                  .prose a {
+                    color: inherit !important;
+                  }
+                  .prose blockquote {
+                    color: inherit !important;
                   }
                   .prose ul, .prose ol {
                     margin-top: ${currentFont.leading === 'leading-6' ? '0.5rem' : currentFont.leading === 'leading-7' ? '0.625rem' : '0.75rem'} !important;
@@ -2247,6 +2195,21 @@ function App() {
                   }
                   .prose code {
                     font-size: ${currentFont.size === 'text-sm' ? '0.8125rem' : currentFont.size === 'text-base' ? '0.9375rem' : '1.0625rem'} !important;
+                    color: inherit !important;
+                  }
+                  .prose pre code {
+                    color: inherit !important;
+                  }
+
+                  /* KaTeX 数学公式样式 */
+                  .prose .katex {
+                    color: inherit !important;
+                  }
+                  .prose .katex-display {
+                    color: inherit !important;
+                  }
+                  .prose .katex-html {
+                    color: inherit !important;
                   }
                 `}</style>
                 {renderedMarkdown}
