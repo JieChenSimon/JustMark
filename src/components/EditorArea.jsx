@@ -18,7 +18,9 @@ const EditorArea = forwardRef(({
   onToggleSidebar,
   onSetSidebarView,
   gitStatus,
-  onEditorScroll
+  onEditorScroll,
+  previewVisible,
+  onTogglePreview
 }, ref) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const textareaRef = useRef(null);
@@ -91,18 +93,41 @@ const EditorArea = forwardRef(({
         {/* 侧边栏导航按钮组 - 只在有文件夹时显示 */}
         {currentFolder && (
           <div className="flex flex-col gap-1">
-            {/* Git 源代码管理按钮 */}
+            {/* 预览切换按钮 */}
+            <button
+              onClick={onTogglePreview}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg backdrop-blur-sm shadow-md transition-all active:scale-95 ${
+                previewVisible
+                  ? 'bg-blue-500/20 dark:bg-blue-500/30 border border-blue-400/50 dark:border-blue-400/50'
+                  : 'bg-gray-100/80 dark:bg-gray-800/80 hover:bg-gray-200/90 dark:hover:bg-gray-700/90 border border-gray-300/50 dark:border-gray-600/50'
+              }`}
+              title={previewVisible ? 'Hide Preview' : 'Show Preview'}
+            >
+              <svg className={`w-4 h-4 ${previewVisible ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {previewVisible ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                )}
+              </svg>
+            </button>
+
+            {/* Git Source Control Button */}
             <button
               onClick={() => {
-                onSetSidebarView('git');
-                onToggleSidebar(true);
+                if (sidebarVisible && sidebarView === 'git') {
+                  onToggleSidebar(false);
+                } else {
+                  onSetSidebarView('git');
+                  onToggleSidebar(true);
+                }
               }}
               className={`w-8 h-8 flex items-center justify-center rounded-lg backdrop-blur-sm shadow-md transition-all active:scale-95 relative ${
                 sidebarVisible && sidebarView === 'git'
                   ? 'bg-blue-500/20 dark:bg-blue-500/30 border border-blue-400/50 dark:border-blue-400/50'
                   : 'bg-gray-100/80 dark:bg-gray-800/80 hover:bg-gray-200/90 dark:hover:bg-gray-700/90 border border-gray-300/50 dark:border-gray-600/50'
               }`}
-              title="源代码管理"
+              title="Source Control"
             >
               <svg className={`w-4 h-4 ${sidebarVisible && sidebarView === 'git' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
@@ -115,7 +140,7 @@ const EditorArea = forwardRef(({
               )}
             </button>
 
-            {/* 文件浏览器按钮 */}
+            {/* File Browser Button */}
             <button
               onClick={() => {
                 onSetSidebarView('files');
@@ -126,7 +151,7 @@ const EditorArea = forwardRef(({
                   ? 'bg-blue-500/20 dark:bg-blue-500/30 border border-blue-400/50 dark:border-blue-400/50'
                   : 'bg-gray-100/80 dark:bg-gray-800/80 hover:bg-gray-200/90 dark:hover:bg-gray-700/90 border border-gray-300/50 dark:border-gray-600/50'
               }`}
-              title={sidebarVisible && sidebarView === 'files' ? '隐藏目录' : '显示目录'}
+              title={sidebarVisible && sidebarView === 'files' ? 'Hide Explorer' : 'Show Explorer'}
             >
               <svg className={`w-4 h-4 ${sidebarVisible && sidebarView === 'files' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />

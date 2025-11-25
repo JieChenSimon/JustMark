@@ -152,13 +152,13 @@ export default function SearchReplace({
   if (!isOpen) return null;
 
   return (
-    <div className="absolute top-4 right-4 z-30 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200/50 dark:border-gray-600/50 p-4 min-w-[400px]">
-      {/* 标题栏 */}
+    <div className="absolute top-4 right-4 z-30 bg-white/70 dark:bg-gray-800/70 backdrop-blur-2xl rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] border border-gray-200/30 dark:border-gray-600/30 p-4 w-[340px]">
+      {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">查找和替换</h3>
+        <h3 className="text-xs font-semibold text-gray-900 dark:text-gray-100">Find and Replace</h3>
         <button
           onClick={onClose}
-          className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors"
+          className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-gray-200/60 dark:hover:bg-gray-700/60 text-gray-500 dark:text-gray-400 transition-all duration-200"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -166,78 +166,79 @@ export default function SearchReplace({
         </button>
       </div>
 
-      {/* 搜索输入 */}
+      {/* Search Input */}
       <div className="space-y-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <input
             ref={searchInputRef}
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="查找..."
-            className="flex-1 px-3 py-1.5 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100"
+            placeholder="Find..."
+            className="flex-1 px-2.5 py-1.5 text-xs bg-white/50 dark:bg-gray-700/50 border border-gray-300/40 dark:border-gray-600/40 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 backdrop-blur-sm transition-all duration-200"
           />
           <button
             onClick={handlePrevious}
             disabled={totalMatches === 0}
-            className="px-2 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-md transition-colors"
-            title="上一个 (Shift+Enter)"
+            className="p-1.5 text-sm bg-white/50 dark:bg-gray-700/50 hover:bg-gray-200/60 dark:hover:bg-gray-600/60 disabled:opacity-40 disabled:cursor-not-allowed rounded-md transition-all duration-200"
+            title="Previous (Shift+Enter)"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
             </svg>
           </button>
           <button
             onClick={handleNext}
             disabled={totalMatches === 0}
-            className="px-2 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-md transition-colors"
-            title="下一个 (Enter)"
+            className="p-1.5 text-sm bg-white/50 dark:bg-gray-700/50 hover:bg-gray-200/60 dark:hover:bg-gray-600/60 disabled:opacity-40 disabled:cursor-not-allowed rounded-md transition-all duration-200"
+            title="Next (Enter)"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
-          <span className="text-xs text-gray-500 dark:text-gray-400 min-w-[60px] text-right">
-            {totalMatches > 0 ? `${currentMatch}/${totalMatches}` : '无结果'}
-          </span>
         </div>
 
-        {/* 替换输入 */}
-        <div className="flex items-center gap-2">
+        <div className="text-[10px] text-gray-500 dark:text-gray-400 text-right -mt-1">
+          {totalMatches > 0 ? `${currentMatch} of ${totalMatches}` : 'No results'}
+        </div>
+
+        {/* Replace Input */}
+        <div className="flex items-center gap-1.5">
           <input
             type="text"
             value={replaceTerm}
             onChange={(e) => setReplaceTerm(e.target.value)}
-            placeholder="替换为..."
-            className="flex-1 px-3 py-1.5 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100"
+            placeholder="Replace..."
+            className="flex-1 px-2.5 py-1.5 text-xs bg-white/50 dark:bg-gray-700/50 border border-gray-300/40 dark:border-gray-600/40 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 backdrop-blur-sm transition-all duration-200"
           />
           <button
             onClick={handleReplace}
             disabled={totalMatches === 0}
-            className="px-3 py-1.5 text-sm bg-blue-500 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-md transition-colors"
+            className="px-2.5 py-1.5 text-[11px] bg-blue-500/90 hover:bg-blue-600/90 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-md transition-all duration-200 font-medium"
           >
-            替换
+            Replace
           </button>
           <button
             onClick={handleReplaceAll}
             disabled={totalMatches === 0}
-            className="px-3 py-1.5 text-sm bg-blue-500 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-md transition-colors"
+            className="px-2.5 py-1.5 text-[11px] bg-blue-500/90 hover:bg-blue-600/90 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-md transition-all duration-200 font-medium"
           >
-            全部
+            All
           </button>
         </div>
 
-        {/* 选项 */}
-        <div className="flex items-center gap-3 pt-1">
-          <label className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 cursor-pointer">
+        {/* Options */}
+        <div className="flex items-center gap-2 pt-0.5">
+          <label className="flex items-center gap-1.5 text-[10px] text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-800 dark:hover:text-gray-300 transition-colors duration-200">
             <input
               type="checkbox"
               checked={caseSensitive}
               onChange={(e) => setCaseSensitive(e.target.checked)}
-              className="w-3.5 h-3.5 rounded border-gray-300 dark:border-gray-600"
+              className="w-3 h-3 rounded border-gray-300 dark:border-gray-600 text-blue-500 focus:ring-1 focus:ring-blue-500/50"
             />
-            区分大小写
+            Match Case
           </label>
         </div>
       </div>

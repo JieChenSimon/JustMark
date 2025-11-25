@@ -12,6 +12,7 @@ import { useGit } from './hooks/useGit';
 import { GitPanel } from './components/GitPanel';
 import PreviewColorPicker from './components/PreviewColorPicker';
 import EditorArea from './components/EditorArea';
+import ConfirmDialog from './components/ConfirmDialog';
 
 // ==============================================
 // 🛠️ 核心配置
@@ -77,9 +78,11 @@ const FONT_FAMILIES = [
 ];
 
 const FONT_OPTIONS = [
-  { label: 'Small',  size: 'text-sm',  leading: 'leading-6',  name: '默认' },
-  { label: 'Medium', size: 'text-base', leading: 'leading-7', name: '中号' },
-  { label: 'Large',  size: 'text-lg',   leading: 'leading-8', name: '大号' },
+  { label: 'Tiny',   size: 'text-xs',   leading: 'leading-5',  name: 'Tiny' },
+  { label: 'Small',  size: 'text-sm',   leading: 'leading-6',  name: 'Small' },
+  { label: 'Medium', size: 'text-base', leading: 'leading-7', name: 'Medium' },
+  { label: 'Large',  size: 'text-lg',   leading: 'leading-8', name: 'Large' },
+  { label: 'XLarge', size: 'text-xl',   leading: 'leading-9', name: 'Extra Large' },
 ];
 
 // 阅读背景色配置（仅用于预览区）
@@ -146,7 +149,7 @@ function InlineCreateRow({
           }
         }}
         className="flex-1 bg-transparent border-b border-gray-300 dark:border-gray-600 text-[11px] text-gray-800 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
-        placeholder={type === 'folder' ? '新建文件夹' : '新建文件'}
+        placeholder={type === 'folder' ? 'New folder' : 'New file'}
         autoComplete="off"
       />
     </div>
@@ -283,7 +286,7 @@ function FileTreeItem({
                 <svg className="w-3.5 h-3.5 flex-shrink-0 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                 </svg>
-                <span>新建文件</span>
+                <span>New File</span>
               </button>
               <button
                 onClick={() => {
@@ -295,14 +298,14 @@ function FileTreeItem({
                 <svg className="w-3.5 h-3.5 flex-shrink-0 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 7a2 2 0 012-2h3l2 2h9a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V7z" />
                 </svg>
-                <span>新建文件夹</span>
+                <span>New Folder</span>
               </button>
               <div className="border-t border-gray-200/50 dark:border-gray-700/50 my-0.5" />
             </>
           )}
           <button
-            onClick={() => {
-              onDeleteEntry(fullPath);
+            onClick={(e) => {
+              onDeleteEntry(fullPath, e);
               setContextMenu(null);
             }}
             className="w-full px-3 py-2 text-left text-[11px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50/80 dark:hover:bg-red-500/10 active:bg-red-100/60 dark:active:bg-red-500/20 transition-colors flex items-center gap-2.5"
@@ -404,7 +407,7 @@ function App() {
 
   const [markdown, setMarkdown] = useState("### JustMark\n Write in a single way...");
   const [isDarkMode, setIsDarkMode] = useState(() => loadSavedState('isDarkMode', false));
-  const [fontIndex, setFontIndex] = useState(() => loadSavedState('fontIndex', 0));
+  const [fontIndex, setFontIndex] = useState(() => loadSavedState('fontIndex', 1)); // Default to Small (index 1)
   const [fontFamilyIndex, setFontFamilyIndex] = useState(() => loadSavedState('fontFamilyIndex', 1));
   const [bgColorIndex, setBgColorIndex] = useState(() => loadSavedState('bgColorIndex', 0));
   const [previewBgColorIndex, setPreviewBgColorIndex] = useState(() => loadSavedState('previewBgColorIndex', null)); // null 表示使用主题颜色
@@ -436,6 +439,18 @@ function App() {
   const pdfContainerRef = useRef(null);
   const previewSectionRef = useRef(null);
   const editorAreaRef = useRef(null);
+
+  // Preview panel visibility
+  const [previewVisible, setPreviewVisible] = useState(() => loadSavedState('previewVisible', true));
+
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    position: null
+  });
 
   // 处理编辑器滚动同步到预览区
   const handleEditorScroll = (scrollPercentage) => {
@@ -509,6 +524,10 @@ function App() {
   useEffect(() => {
     saveState('previewMode', previewMode);
   }, [previewMode]);
+
+  useEffect(() => {
+    saveState('previewVisible', previewVisible);
+  }, [previewVisible]);
 
   useEffect(() => {
     saveState('sidebarVisible', sidebarVisible);
@@ -949,9 +968,14 @@ function App() {
   const confirmInlineCreate = async () => {
     if (!inlineCreate || !inlineCreate.value.trim()) return;
 
-    const fileName = inlineCreate.value.trim();
+    let fileName = inlineCreate.value.trim();
     const folderPath = inlineCreate.parentPath;
     const isFolder = inlineCreate.type === 'folder';
+
+    // 如果是文件且没有 .md 后缀，自动添加
+    if (!isFolder && !fileName.endsWith('.md')) {
+      fileName = fileName + '.md';
+    }
 
     if (!/^[\w\-. ]+$/.test(fileName)) {
       alert('❌ 名称包含不允许的字符！只能使用字母、数字、下划线、连字符、点和空格。');
@@ -1223,48 +1247,60 @@ function App() {
   };
 
   // 删除文件或文件夹
-  const handleDeleteFile = async (filePath) => {
+  const handleDeleteFile = async (filePath, event = null) => {
     const fileName = filePath.split('/').pop();
-    const confirmed = confirm(`确定要删除 "${fileName}" 吗？`);
-    if (!confirmed) return;
 
-    try {
-      await deleteEntryWithFallback(filePath);
+    // 获取鼠标位置
+    const position = event ? { x: event.clientX, y: event.clientY } : null;
 
-      // 如果删除的是当前打开的文件，则清空编辑器
-      if (currentFilePath === filePath || currentFilePath?.startsWith(filePath + '/')) {
-        setMarkdown('');
-        setCurrentFilePath(null);
-        setHasUnsavedChanges(false);
-      }
+    // Show custom confirm dialog
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Item',
+      message: `Are you sure you want to delete "${fileName}"? This action cannot be undone.`,
+      position: position,
+      onConfirm: async () => {
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
 
-      // 获取父文件夹路径
-      const lastSlashIndex = filePath.lastIndexOf('/');
-      const parentPath = lastSlashIndex > 0 ? filePath.substring(0, lastSlashIndex) : currentFolder;
-      
-      // 刷新父文件夹内容
-      if (parentPath) {
-        await refreshFolderContents(parentPath);
-      }
-      
-      // 从展开的文件夹集合中移除被删除的文件夹
-      setExpandedFolders(prev => {
-        const newSet = new Set(prev);
-        Array.from(newSet).forEach(path => {
-          if (path === filePath || path.startsWith(filePath + '/')) {
-            newSet.delete(path);
+        try {
+          await deleteEntryWithFallback(filePath);
+
+          // 如果删除的是当前打开的文件，则清空编辑器
+          if (currentFilePath === filePath || currentFilePath?.startsWith(filePath + '/')) {
+            setMarkdown('');
+            setCurrentFilePath(null);
+            setHasUnsavedChanges(false);
           }
-        });
-        return newSet;
-      });
 
-      if (selectedSidebarEntry && (selectedSidebarEntry.path === filePath || selectedSidebarEntry.path.startsWith(filePath + '/'))) {
-        setSelectedSidebarEntry(null);
+          // 获取父文件夹路径
+          const lastSlashIndex = filePath.lastIndexOf('/');
+          const parentPath = lastSlashIndex > 0 ? filePath.substring(0, lastSlashIndex) : currentFolder;
+
+          // 刷新父文件夹内容
+          if (parentPath) {
+            await refreshFolderContents(parentPath);
+          }
+
+          // 从展开的文件夹集合中移除被删除的文件夹
+          setExpandedFolders(prev => {
+            const newSet = new Set(prev);
+            Array.from(newSet).forEach(path => {
+              if (path === filePath || path.startsWith(filePath + '/')) {
+                newSet.delete(path);
+              }
+            });
+            return newSet;
+          });
+
+          if (selectedSidebarEntry && (selectedSidebarEntry.path === filePath || selectedSidebarEntry.path.startsWith(filePath + '/'))) {
+            setSelectedSidebarEntry(null);
+          }
+        } catch (error) {
+          console.error('删除文件失败:', error);
+          alert('❌ Delete failed: ' + (error?.message || error));
+        }
       }
-    } catch (error) {
-      console.error('删除文件失败:', error);
-      alert('❌ 删除文件失败: ' + (error?.message || error));
-    }
+    });
   };
 
   // 保存文件
@@ -1453,9 +1489,7 @@ function App() {
   const renderedMarkdown = useMemo(() => (
     <ReactMarkdown
       remarkPlugins={[
-        [remarkMath, {
-          singleDollarTextMath: false
-        }],
+        remarkMath,
         remarkGfm
       ]}
       rehypePlugins={[rehypeKatex]}
@@ -1602,6 +1636,21 @@ function App() {
         }
         .animate-fade-in {
           animation: fade-in 0.2s ease-out;
+        }
+
+        /* Modal dialog scale-in animation */
+        @keyframes scale-in {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .animate-scale-in {
+          animation: scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         /* 平滑的颜色过渡 - 仅应用于关键元素 */
@@ -2069,27 +2118,35 @@ function App() {
             onSetSidebarView={setSidebarView}
             gitStatus={git.status}
             onEditorScroll={handleEditorScroll}
+            previewVisible={previewVisible}
+            onTogglePreview={() => setPreviewVisible(!previewVisible)}
           />
         </section>
 
         {/* 编辑器和预览区之间的分隔符 */}
-        <div
-          className="w-px bg-gray-200/50 dark:bg-gray-700/50 hover:bg-gray-300/70 dark:hover:bg-gray-600/70 cursor-col-resize active:bg-blue-400/70 dark:active:bg-blue-500/70 transition-colors relative group"
-          onMouseDown={() => setIsDraggingEditor(true)}
-        >
-          <div className="absolute inset-y-0 -left-2 -right-2" />
-        </div>
+        {previewVisible && (
+          <div
+            className="w-px bg-gray-200/50 dark:bg-gray-700/50 hover:bg-gray-300/70 dark:hover:bg-gray-600/70 cursor-col-resize active:bg-blue-400/70 dark:active:bg-blue-500/70 transition-colors relative group"
+            onMouseDown={() => setIsDraggingEditor(true)}
+          >
+            <div className="absolute inset-y-0 -left-2 -right-2" />
+          </div>
+        )}
 
         {/* 右侧：预览区 */}
-        <section
-          ref={(el) => {
-            pdfContainerRef.current = el;
-            previewSectionRef.current = el;
-          }}
-          className="flex-1 h-full overflow-y-auto flex justify-center transition-colors duration-300 relative"
-          style={{ backgroundColor: previewBgColor }}
-          onClick={handlePreviewClick}
-        >
+        {previewVisible && (
+          <section
+              ref={(el) => {
+                pdfContainerRef.current = el;
+                previewSectionRef.current = el;
+              }}
+              className="flex-1 h-full overflow-y-auto flex justify-center transition-colors duration-300 relative"
+              style={{ backgroundColor: previewBgColor }}
+              onClick={(e) => {
+                handlePreviewClick();
+                handlePreviewClickToJump(e);
+              }}
+            >
 
           {/* macOS 风格的预览模式指示器 */}
           {showIndicator && (
@@ -2132,32 +2189,104 @@ function App() {
               >
                 <style>{`
                   .prose {
-                    font-size: ${currentFont.size === 'text-sm' ? '0.875rem' : currentFont.size === 'text-base' ? '1rem' : '1.125rem'} !important;
-                    line-height: ${currentFont.leading === 'leading-6' ? '1.5rem' : currentFont.leading === 'leading-7' ? '1.75rem' : '2rem'} !important;
+                    font-size: ${
+                      currentFont.size === 'text-xs' ? '0.75rem' :
+                      currentFont.size === 'text-sm' ? '0.875rem' :
+                      currentFont.size === 'text-base' ? '1rem' :
+                      currentFont.size === 'text-lg' ? '1.125rem' :
+                      '1.25rem'
+                    } !important;
+                    line-height: ${
+                      currentFont.leading === 'leading-5' ? '1.25rem' :
+                      currentFont.leading === 'leading-6' ? '1.5rem' :
+                      currentFont.leading === 'leading-7' ? '1.75rem' :
+                      currentFont.leading === 'leading-8' ? '2rem' :
+                      '2.25rem'
+                    } !important;
                   }
                   .prose p {
                     margin-top: 0 !important;
-                    margin-bottom: ${currentFont.leading === 'leading-6' ? '0.75rem' : currentFont.leading === 'leading-7' ? '0.875rem' : '1rem'} !important;
+                    margin-bottom: ${
+                      currentFont.leading === 'leading-5' ? '0.625rem' :
+                      currentFont.leading === 'leading-6' ? '0.75rem' :
+                      currentFont.leading === 'leading-7' ? '0.875rem' :
+                      currentFont.leading === 'leading-8' ? '1rem' :
+                      '1.125rem'
+                    } !important;
                   }
                   .prose h1 {
-                    font-size: ${currentFont.size === 'text-sm' ? '1.5rem' : currentFont.size === 'text-base' ? '1.875rem' : '2.25rem'} !important;
+                    font-size: ${
+                      currentFont.size === 'text-xs' ? '1.25rem' :
+                      currentFont.size === 'text-sm' ? '1.5rem' :
+                      currentFont.size === 'text-base' ? '1.875rem' :
+                      currentFont.size === 'text-lg' ? '2.25rem' :
+                      '2.5rem'
+                    } !important;
                     line-height: 1.2 !important;
-                    margin-top: ${currentFont.leading === 'leading-6' ? '1rem' : currentFont.leading === 'leading-7' ? '1.25rem' : '1.5rem'} !important;
-                    margin-bottom: ${currentFont.leading === 'leading-6' ? '0.5rem' : currentFont.leading === 'leading-7' ? '0.625rem' : '0.75rem'} !important;
+                    margin-top: ${
+                      currentFont.leading === 'leading-5' ? '0.875rem' :
+                      currentFont.leading === 'leading-6' ? '1rem' :
+                      currentFont.leading === 'leading-7' ? '1.25rem' :
+                      currentFont.leading === 'leading-8' ? '1.5rem' :
+                      '1.75rem'
+                    } !important;
+                    margin-bottom: ${
+                      currentFont.leading === 'leading-5' ? '0.375rem' :
+                      currentFont.leading === 'leading-6' ? '0.5rem' :
+                      currentFont.leading === 'leading-7' ? '0.625rem' :
+                      currentFont.leading === 'leading-8' ? '0.75rem' :
+                      '0.875rem'
+                    } !important;
                     color: inherit !important;
                   }
                   .prose h2 {
-                    font-size: ${currentFont.size === 'text-sm' ? '1.25rem' : currentFont.size === 'text-base' ? '1.5rem' : '1.875rem'} !important;
+                    font-size: ${
+                      currentFont.size === 'text-xs' ? '1.125rem' :
+                      currentFont.size === 'text-sm' ? '1.25rem' :
+                      currentFont.size === 'text-base' ? '1.5rem' :
+                      currentFont.size === 'text-lg' ? '1.875rem' :
+                      '2.125rem'
+                    } !important;
                     line-height: 1.2 !important;
-                    margin-top: ${currentFont.leading === 'leading-6' ? '0.875rem' : currentFont.leading === 'leading-7' ? '1rem' : '1.25rem'} !important;
-                    margin-bottom: ${currentFont.leading === 'leading-6' ? '0.5rem' : currentFont.leading === 'leading-7' ? '0.625rem' : '0.75rem'} !important;
+                    margin-top: ${
+                      currentFont.leading === 'leading-5' ? '0.75rem' :
+                      currentFont.leading === 'leading-6' ? '0.875rem' :
+                      currentFont.leading === 'leading-7' ? '1rem' :
+                      currentFont.leading === 'leading-8' ? '1.25rem' :
+                      '1.5rem'
+                    } !important;
+                    margin-bottom: ${
+                      currentFont.leading === 'leading-5' ? '0.375rem' :
+                      currentFont.leading === 'leading-6' ? '0.5rem' :
+                      currentFont.leading === 'leading-7' ? '0.625rem' :
+                      currentFont.leading === 'leading-8' ? '0.75rem' :
+                      '0.875rem'
+                    } !important;
                     color: inherit !important;
                   }
                   .prose h3 {
-                    font-size: ${currentFont.size === 'text-sm' ? '1.125rem' : currentFont.size === 'text-base' ? '1.25rem' : '1.5rem'} !important;
+                    font-size: ${
+                      currentFont.size === 'text-xs' ? '1rem' :
+                      currentFont.size === 'text-sm' ? '1.125rem' :
+                      currentFont.size === 'text-base' ? '1.25rem' :
+                      currentFont.size === 'text-lg' ? '1.5rem' :
+                      '1.75rem'
+                    } !important;
                     line-height: 1.2 !important;
-                    margin-top: ${currentFont.leading === 'leading-6' ? '0.75rem' : currentFont.leading === 'leading-7' ? '0.875rem' : '1rem'} !important;
-                    margin-bottom: ${currentFont.leading === 'leading-6' ? '0.375rem' : currentFont.leading === 'leading-7' ? '0.5rem' : '0.625rem'} !important;
+                    margin-top: ${
+                      currentFont.leading === 'leading-5' ? '0.625rem' :
+                      currentFont.leading === 'leading-6' ? '0.75rem' :
+                      currentFont.leading === 'leading-7' ? '0.875rem' :
+                      currentFont.leading === 'leading-8' ? '1rem' :
+                      '1.125rem'
+                    } !important;
+                    margin-bottom: ${
+                      currentFont.leading === 'leading-5' ? '0.25rem' :
+                      currentFont.leading === 'leading-6' ? '0.375rem' :
+                      currentFont.leading === 'leading-7' ? '0.5rem' :
+                      currentFont.leading === 'leading-8' ? '0.625rem' :
+                      '0.75rem'
+                    } !important;
                     color: inherit !important;
                   }
                   .prose h4, .prose h5, .prose h6 {
@@ -2351,9 +2480,23 @@ function App() {
               </div>
             </div>
           )}
-        </section>
+          </section>
+        )}
 
       </main>
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        isDangerous={true}
+        position={confirmDialog.position}
+      />
     </div>
   );
 }

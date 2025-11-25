@@ -15,11 +15,11 @@ export default function PreviewColorPicker({
   return (
     <div className="absolute bottom-6 right-6 z-10">
       <div className="relative">
-        {/* 圆形颜色按钮 */}
+        {/* Color Picker Button */}
         <button
           onClick={onToggleMenu}
           className="w-8 h-8 flex items-center justify-center rounded-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-200/50 dark:border-gray-600/50"
-          title="预览区颜色"
+          title="Preview Background Color"
         >
           <div
             className="w-4 h-4 rounded-full border-2 border-white dark:border-gray-600"
@@ -27,21 +27,21 @@ export default function PreviewColorPicker({
           ></div>
         </button>
 
-        {/* 颜色选择菜单 - 从下往上展开 */}
+        {/* Color Selection Menu */}
         {showMenu && (
           <div className="absolute bottom-10 right-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200/50 dark:border-gray-600/50 p-3 min-w-[240px]">
-            {/* 重置选项 */}
+            {/* Reset Option */}
             <button
               onClick={onReset}
               className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 text-gray-700 dark:text-gray-300 mb-2 border-b border-gray-200 dark:border-gray-600"
             >
-              <span className="font-medium">跟随主题</span>
+              <span className="font-medium">Follow Theme</span>
               <span className="text-xs text-gray-500 dark:text-gray-400 block mt-0.5">
-                使用当前主题颜色
+                Use current theme color
               </span>
             </button>
 
-            {/* 颜色选项列表 */}
+            {/* Color Options List */}
             <div className="space-y-1">
               {BACKGROUND_COLORS.map((color, index) => (
                 <button
