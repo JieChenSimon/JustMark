@@ -13,7 +13,7 @@ export default function PreviewColorPicker({
   onReset
 }) {
   return (
-    <div className="absolute bottom-6 right-6 z-10">
+    <div className="fixed bottom-6 right-6 z-10">
       <div className="relative">
         {/* Color Picker Button */}
         <button
@@ -47,11 +47,10 @@ export default function PreviewColorPicker({
                 <button
                   key={index}
                   onClick={() => onColorSelect(index)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
-                    previewBgColorIndex === index
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${previewBgColorIndex === index
                       ? 'bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-500'
                       : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
+                    }`}
                 >
                   <div
                     className="w-5 h-5 rounded-md border-2 border-gray-300 dark:border-gray-600 flex-shrink-0"

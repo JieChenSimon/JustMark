@@ -20,16 +20,16 @@ export default function ConfirmDialog({
     if (!position) return {};
 
     // 确保对话框不会超出屏幕边界
-    const dialogWidth = 240; // 减小宽度
-    const dialogHeight = 150;
+    const dialogWidth = 200; // 更紧凑的宽度
+    const dialogHeight = 100;
     const padding = 10;
 
-    let x = position.x;
+    let x = position.x + 10; // 在鼠标右侧显示
     let y = position.y;
 
     // 防止超出右边界
     if (x + dialogWidth > window.innerWidth - padding) {
-      x = window.innerWidth - dialogWidth - padding;
+      x = position.x - dialogWidth - 10; // 显示在鼠标左侧
     }
 
     // 防止超出底部边界
@@ -49,25 +49,25 @@ export default function ConfirmDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-50 pointer-events-none">
+      {/* Transparent overlay to capture clicks outside */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 pointer-events-auto"
         onClick={onCancel}
       />
 
       {/* Dialog */}
       <div
-        className="relative bg-white/70 dark:bg-gray-800/70 backdrop-blur-2xl rounded-xl shadow-[0_20px_60px_rgb(0,0,0,0.3)] dark:shadow-[0_20px_60px_rgb(0,0,0,0.6)] border border-gray-200/30 dark:border-gray-600/30 p-4 w-[240px] animate-scale-in"
+        className="relative bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-lg shadow-xl border border-gray-200/50 dark:border-gray-700/50 p-3 w-[200px] animate-scale-in pointer-events-auto"
         style={position ? getDialogPosition() : {}}
       >
         {/* Title */}
-        <h3 className="text-xs font-semibold text-gray-900 dark:text-gray-100 mb-1.5">
+        <h3 className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 mb-1">
           {title}
         </h3>
 
         {/* Message */}
-        <p className="text-[11px] text-gray-600 dark:text-gray-400 mb-3 leading-relaxed">
+        <p className="text-[10px] text-gray-600 dark:text-gray-400 mb-2.5 leading-snug">
           {message}
         </p>
 
@@ -75,17 +75,16 @@ export default function ConfirmDialog({
         <div className="flex gap-1.5 justify-end">
           <button
             onClick={onCancel}
-            className="px-3 py-1 text-[11px] font-medium text-gray-700 dark:text-gray-300 bg-white/50 dark:bg-gray-700/50 hover:bg-gray-200/60 dark:hover:bg-gray-600/60 rounded-md transition-all duration-200"
+            className="px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
           >
             {cancelText}
           </button>
           <button
             onClick={onConfirm}
-            className={`px-3 py-1 text-[11px] font-medium text-white rounded-md transition-all duration-200 shadow-sm ${
-              isDangerous
-                ? 'bg-red-500/90 hover:bg-red-600/90'
-                : 'bg-blue-500/90 hover:bg-blue-600/90'
-            }`}
+            className={`px-2 py-0.5 text-[10px] font-medium text-white rounded shadow-sm transition-colors ${isDangerous
+                ? 'bg-red-500 hover:bg-red-600'
+                : 'bg-blue-500 hover:bg-blue-600'
+              }`}
           >
             {confirmText}
           </button>

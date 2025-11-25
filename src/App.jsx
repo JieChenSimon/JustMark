@@ -8,6 +8,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile, writeFile, readTextFile, readDir, remove, mkdir } from '@tauri-apps/plugin-fs';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useGit } from './hooks/useGit';
 import { GitPanel } from './components/GitPanel';
 import PreviewColorPicker from './components/PreviewColorPicker';
@@ -78,11 +79,11 @@ const FONT_FAMILIES = [
 ];
 
 const FONT_OPTIONS = [
-  { label: 'Tiny',   size: 'text-xs',   leading: 'leading-5',  name: 'Tiny' },
-  { label: 'Small',  size: 'text-sm',   leading: 'leading-6',  name: 'Small' },
+  { label: 'Tiny', size: 'text-xs', leading: 'leading-5', name: 'Tiny' },
+  { label: 'Small', size: 'text-sm', leading: 'leading-6', name: 'Small' },
   { label: 'Medium', size: 'text-base', leading: 'leading-7', name: 'Medium' },
-  { label: 'Large',  size: 'text-lg',   leading: 'leading-8', name: 'Large' },
-  { label: 'XLarge', size: 'text-xl',   leading: 'leading-9', name: 'Extra Large' },
+  { label: 'Large', size: 'text-lg', leading: 'leading-8', name: 'Large' },
+  { label: 'XLarge', size: 'text-xl', leading: 'leading-9', name: 'Extra Large' },
 ];
 
 // 阅读背景色配置（仅用于预览区）
@@ -190,6 +191,9 @@ function FileTreeItem({
         setChildren(contents);
         setIsLoading(false);
       });
+    } else if (!isExpanded && children.length > 0) {
+      // 当折叠时清空子内容，这样下次展开时会重新加载
+      setChildren([]);
     }
   }, [isExpanded]);
 
@@ -212,11 +216,11 @@ function FileTreeItem({
     if (onSelectEntry) {
       onSelectEntry(fullPath, entry.isDirectory);
     }
-    
+
     // 获取鼠标位置
     const x = e.clientX;
     const y = e.clientY;
-    
+
     setContextMenu({
       x,
       y,
@@ -237,18 +241,16 @@ function FileTreeItem({
       <button
         onClick={handleClick}
         onContextMenu={handleContextMenu}
-        className={`w-full px-2 py-1 text-left text-[11px] flex items-center gap-1.5 transition-all group ${
-          isSelected
-            ? 'bg-blue-500/15 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300'
-            : 'hover:bg-gray-100/80 dark:hover:bg-gray-800/50 text-gray-700 dark:text-gray-300'
-        }`}
+        className={`w-full px-2 py-1 text-left text-[11px] flex items-center gap-1.5 transition-all group ${isSelected
+          ? 'bg-blue-500/15 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300'
+          : 'hover:bg-gray-100/80 dark:hover:bg-gray-800/50 text-gray-700 dark:text-gray-300'
+          }`}
         style={{ paddingLeft: `${indent + 8}px` }}
       >
         {entry.isDirectory && (
           <svg
-            className={`w-3 h-3 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''} ${
-              isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
-            }`}
+            className={`w-3 h-3 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''} ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
+              }`}
             fill="currentColor"
             viewBox="0 0 20 20"
           >
@@ -264,14 +266,14 @@ function FileTreeItem({
         </span>
       </button>
 
-      {/* macOS 风格的右键菜单 */}
+      {/* macOS 风格的右键菜单 - 更紧凑 */}
       {contextMenu && contextMenu.path === fullPath && (
         <div
-          className="fixed z-50 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 rounded-lg shadow-lg overflow-hidden"
-          style={{ 
-            top: `${Math.min(contextMenu.y, window.innerHeight - 120)}px`, 
+          className="fixed z-50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 rounded-lg shadow-lg overflow-hidden animate-scale-in origin-top-left"
+          style={{
+            top: `${Math.min(contextMenu.y, window.innerHeight - 100)}px`,
             left: `${contextMenu.x}px`,
-            minWidth: '160px'
+            width: '100px'
           }}
         >
           {contextMenu.type === 'folder' && (
@@ -281,10 +283,10 @@ function FileTreeItem({
                   onStartInlineCreate(fullPath, 'file');
                   setContextMenu(null);
                 }}
-                className="w-full px-3 py-2 text-left text-[11px] font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-gray-700/60 active:bg-gray-200/60 dark:active:bg-gray-600/60 transition-colors flex items-center gap-2.5"
+                className="w-full px-2 py-1 text-left text-[10px] font-medium text-gray-700 dark:text-gray-200 hover:bg-blue-500 hover:text-white dark:hover:bg-blue-600 transition-colors flex items-center gap-2"
               >
-                <svg className="w-3.5 h-3.5 flex-shrink-0 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
                 <span>New File</span>
               </button>
@@ -293,14 +295,14 @@ function FileTreeItem({
                   onStartInlineCreate(fullPath, 'folder');
                   setContextMenu(null);
                 }}
-                className="w-full px-3 py-2 text-left text-[11px] font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-gray-700/60 active:bg-gray-200/60 dark:active:bg-gray-600/60 transition-colors flex items-center gap-2.5"
+                className="w-full px-2 py-1 text-left text-[10px] font-medium text-gray-700 dark:text-gray-200 hover:bg-blue-500 hover:text-white dark:hover:bg-blue-600 transition-colors flex items-center gap-2"
               >
-                <svg className="w-3.5 h-3.5 flex-shrink-0 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 7a2 2 0 012-2h3l2 2h9a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V7z" />
+                <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7a2 2 0 012-2h3l2 2h9a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V7z" />
                 </svg>
                 <span>New Folder</span>
               </button>
-              <div className="border-t border-gray-200/50 dark:border-gray-700/50 my-0.5" />
+              <div className="h-px bg-gray-200/50 dark:bg-gray-700/50 my-0.5 mx-1" />
             </>
           )}
           <button
@@ -308,12 +310,12 @@ function FileTreeItem({
               onDeleteEntry(fullPath, e);
               setContextMenu(null);
             }}
-            className="w-full px-3 py-2 text-left text-[11px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50/80 dark:hover:bg-red-500/10 active:bg-red-100/60 dark:active:bg-red-500/20 transition-colors flex items-center gap-2.5"
+            className="w-full px-2 py-1 text-left text-[10px] font-medium text-gray-700 dark:text-gray-200 hover:bg-blue-500 hover:text-white dark:hover:bg-blue-600 transition-colors flex items-center gap-2"
           >
-            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3H4v2h16V7h-3z" />
+            <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3H4v2h16V7h-3z" />
             </svg>
-            <span>删除</span>
+            <span>Delete</span>
           </button>
         </div>
       )}
@@ -581,12 +583,12 @@ function App() {
     };
 
     updatePdfScale();
-    
+
     // 使用 ResizeObserver 监听容器宽度变化（用于拖动分隔符时的自适应）
     const resizeObserver = new ResizeObserver(() => {
       updatePdfScale();
     });
-    
+
     resizeObserver.observe(pdfContainerRef.current);
     window.addEventListener('resize', updatePdfScale);
 
@@ -732,6 +734,72 @@ function App() {
     showPreviewIndicator();
   };
 
+  // 平滑调整窗口大小的辅助函数
+  const smoothResizeWindow = async (targetWidth, targetHeight, duration = 500) => {
+    try {
+      const appWindow = getCurrentWindow();
+      const currentSize = await appWindow.innerSize();
+
+      const startWidth = currentSize.width;
+      const startHeight = currentSize.height;
+      const startTime = performance.now();
+
+      // 使用 ease-in-out cubic 缓动函数，更明显的动画效果
+      const easeInOutCubic = (t) => {
+        return t < 0.5
+          ? 4 * t * t * t
+          : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      };
+
+      const animate = async (currentTime) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const easedProgress = easeInOutCubic(progress);
+
+        const newWidth = Math.round(startWidth + (targetWidth - startWidth) * easedProgress);
+        const newHeight = Math.round(startHeight + (targetHeight - startHeight) * easedProgress);
+
+        await appWindow.setSize({ width: newWidth, height: newHeight });
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        }
+      };
+
+      requestAnimationFrame(animate);
+    } catch (error) {
+      console.error('平滑调整窗口大小失败:', error);
+    }
+  };
+
+  // 切换预览可见性并调整窗口大小
+  const togglePreviewVisibility = async () => {
+    const newVisible = !previewVisible;
+    setPreviewVisible(newVisible);
+
+    try {
+      const appWindow = getCurrentWindow();
+      const currentSize = await appWindow.innerSize();
+
+      // 假设预览区宽度约为窗口宽度的 40%
+      const widthChange = Math.floor(currentSize.width * 0.4);
+
+      let targetWidth;
+      if (!newVisible) {
+        // 关闭预览：缩小窗口
+        targetWidth = currentSize.width - widthChange;
+      } else {
+        // 打开预览：扩大窗口
+        targetWidth = currentSize.width + widthChange;
+      }
+
+      // 使用平滑动画调整窗口大小
+      await smoothResizeWindow(targetWidth, currentSize.height);
+    } catch (error) {
+      console.error('调整窗口大小失败:', error);
+    }
+  };
+
   // 点击预览区显示指示器
   const handlePreviewClick = () => {
     showPreviewIndicator();
@@ -794,8 +862,8 @@ function App() {
     const handleClickOutside = (e) => {
       // 如果点击的是输入框或其父元素，不取消
       if (inlineCreateInputRef.current &&
-          (e.target === inlineCreateInputRef.current ||
-           inlineCreateInputRef.current.contains(e.target))) {
+        (e.target === inlineCreateInputRef.current ||
+          inlineCreateInputRef.current.contains(e.target))) {
         return;
       }
 
@@ -857,7 +925,7 @@ function App() {
       const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
 
       if (cmdOrCtrl) {
-        switch(e.key.toLowerCase()) {
+        switch (e.key.toLowerCase()) {
           case 'n':
             e.preventDefault();
             handleNew({ fromHotkey: true });
@@ -1360,7 +1428,7 @@ function App() {
     setMarkdown(e.target.value);
     setHasUnsavedChanges(true);
   };
-  
+
   // 字体变大
   const increaseFontSize = () => {
     setFontIndex((prev) => Math.min(prev + 1, FONT_OPTIONS.length - 1));
@@ -1571,7 +1639,7 @@ function App() {
         color: appTextColor
       }}
     >
-      
+
       {/* 添加打印样式和 macOS 风格动画 */}
       <style>{`
         @media print {
@@ -1738,7 +1806,7 @@ function App() {
           -ms-user-select: none !important;
         }
       `}</style>
-      
+
       {/* === 工具栏 === */}
       <header
         className={`${HEADER_HEIGHT} flex-none z-50 border-b transition-colors duration-300`}
@@ -1759,11 +1827,10 @@ function App() {
             <div className="relative">
               <button
                 onClick={() => handleNew()}
-                className={`px-2 py-0.5 text-[10px] font-medium rounded transition-all flex items-center gap-1 ${
-                  currentFolder
-                    ? 'text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800'
-                    : 'text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-400 hover:bg-gray-100/60 dark:hover:bg-gray-800/60'
-                }`}
+                className={`px-2 py-0.5 text-[10px] font-medium rounded transition-all flex items-center gap-1 ${currentFolder
+                  ? 'text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  : 'text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-400 hover:bg-gray-100/60 dark:hover:bg-gray-800/60'
+                  }`}
                 title={currentFolder ? 'New (Cmd+N)' : 'New Document (Cmd+N)'}
               >
                 New
@@ -1872,9 +1939,8 @@ function App() {
                     <button
                       key={index}
                       onClick={() => handleFontChange(index)}
-                      className={`w-full px-3 py-2 text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
-                        fontFamilyIndex === index ? 'bg-gray-100 dark:bg-gray-700' : ''
-                      }`}
+                      className={`w-full px-3 py-2 text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${fontFamilyIndex === index ? 'bg-gray-100 dark:bg-gray-700' : ''
+                        }`}
                       style={{ fontFamily: font.family }}
                     >
                       <div className="font-medium text-gray-900 dark:text-gray-100">
@@ -1927,9 +1993,8 @@ function App() {
                     <button
                       key={index}
                       onClick={() => handleBgColorChange(index)}
-                      className={`w-full px-3 py-2 text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2 ${
-                        bgColorIndex === index ? 'bg-gray-100 dark:bg-gray-700' : ''
-                      }`}
+                      className={`w-full px-3 py-2 text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2 ${bgColorIndex === index ? 'bg-gray-100 dark:bg-gray-700' : ''
+                        }`}
                     >
                       <div
                         className="w-5 h-5 rounded border border-gray-300 dark:border-gray-600 flex-shrink-0"
@@ -1993,7 +2058,7 @@ function App() {
         <section
           className="h-full border-r transition-colors duration-300 relative flex"
           style={{
-            width: `${editorWidth}%`,
+            width: previewVisible ? `${editorWidth}%` : '100%',
             backgroundColor: appBgColor,
             borderRightColor: 'rgba(0, 0, 0, 0.1)'
           }}
@@ -2009,97 +2074,97 @@ function App() {
                   borderRightColor: 'rgba(0, 0, 0, 0.1)'
                 }}
               >
-              {sidebarView === 'files' ? (
-                <>
-                  {/* 文件浏览器头部 */}
-                  <div
-                    className="h-10 px-3 flex items-center justify-between border-b flex-shrink-0"
-                    style={{
-                      borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-                      backgroundColor: appBgColor
-                    }}
-                  >
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span
-                        className="text-[11px] font-semibold truncate"
-                        style={{ color: appTextColor }}
-                      >
-                        {currentFolder.split('/').pop() || 'Files'}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => setSidebarVisible(false)}
-                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200/70 dark:hover:bg-gray-700/70 transition-all active:scale-95"
-                      title="Close"
+                {sidebarView === 'files' ? (
+                  <>
+                    {/* 文件浏览器头部 */}
+                    <div
+                      className="h-10 px-3 flex items-center justify-between border-b flex-shrink-0"
+                      style={{
+                        borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+                        backgroundColor: appBgColor
+                      }}
                     >
-                      <svg className="w-3 h-3 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span
+                          className="text-[11px] font-semibold truncate"
+                          style={{ color: appTextColor }}
+                        >
+                          {currentFolder.split('/').pop() || 'Files'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setSidebarVisible(false)}
+                        className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200/70 dark:hover:bg-gray-700/70 transition-all active:scale-95"
+                        title="Close"
+                      >
+                        <svg className="w-3 h-3 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
 
-                  {/* 文件树列表 */}
-                  <div className="flex-1 overflow-y-auto overflow-x-hidden py-1 custom-scrollbar">
-                    {inlineCreate && inlineCreate.parentPath === currentFolder && (
-                      <InlineCreateRow
-                        level={0}
-                        type={inlineCreate.type}
-                        value={inlineCreate.value}
-                        inputRef={inlineCreateInputRef}
-                        onChange={handleInlineNameChange}
-                        onConfirm={confirmInlineCreate}
-                        onCancel={cancelInlineCreate}
-                      />
-                    )}
-                    {folderContents.map((entry, index) => (
-                      <FileTreeItem
-                        key={index}
-                        entry={entry}
-                        basePath={currentFolder}
-                        level={0}
-                        currentFilePath={currentFilePath}
-                        expandedFolders={expandedFolders}
-                        onToggleFolder={toggleFolder}
-                        onOpenFile={handleOpenFileFromSidebar}
-                        getSubfolderContents={getSubfolderContents}
-                        onStartInlineCreate={startCreateEntryFromContext}
-                      onDeleteEntry={handleDeleteFile}
-                        inlineCreate={inlineCreate}
-                        inlineInputRef={inlineCreateInputRef}
-                        onInlineChange={handleInlineNameChange}
-                        onInlineConfirm={confirmInlineCreate}
-                        onInlineCancel={cancelInlineCreate}
-                        onSelectEntry={handleSelectSidebarEntry}
-                      />
-                    ))}
-                  </div>
-                </>
-              ) : (
-                /* Git 源代码管理面板 */
-                <GitPanel
-                  gitStatus={git.status}
-                  onStageFile={git.stageFile}
-                  onUnstageFile={git.unstageFile}
-                  onStageAll={git.stageAll}
-                  onUnstageAll={git.unstageAll}
-                  onCommit={git.commit}
-                  onDiscardChanges={git.discardChanges}
-                  onGetLog={git.getLog}
-                  onClose={() => setSidebarVisible(false)}
-                  appBgColor={appBgColor}
-                  appTextColor={appTextColor}
-                />
-              )}
-            </div>
+                    {/* 文件树列表 */}
+                    <div className="flex-1 overflow-y-auto overflow-x-hidden py-1 custom-scrollbar">
+                      {inlineCreate && inlineCreate.parentPath === currentFolder && (
+                        <InlineCreateRow
+                          level={0}
+                          type={inlineCreate.type}
+                          value={inlineCreate.value}
+                          inputRef={inlineCreateInputRef}
+                          onChange={handleInlineNameChange}
+                          onConfirm={confirmInlineCreate}
+                          onCancel={cancelInlineCreate}
+                        />
+                      )}
+                      {folderContents.map((entry, index) => (
+                        <FileTreeItem
+                          key={index}
+                          entry={entry}
+                          basePath={currentFolder}
+                          level={0}
+                          currentFilePath={currentFilePath}
+                          expandedFolders={expandedFolders}
+                          onToggleFolder={toggleFolder}
+                          onOpenFile={handleOpenFileFromSidebar}
+                          getSubfolderContents={getSubfolderContents}
+                          onStartInlineCreate={startCreateEntryFromContext}
+                          onDeleteEntry={handleDeleteFile}
+                          inlineCreate={inlineCreate}
+                          inlineInputRef={inlineCreateInputRef}
+                          onInlineChange={handleInlineNameChange}
+                          onInlineConfirm={confirmInlineCreate}
+                          onInlineCancel={cancelInlineCreate}
+                          onSelectEntry={handleSelectSidebarEntry}
+                        />
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  /* Git 源代码管理面板 */
+                  <GitPanel
+                    gitStatus={git.status}
+                    onStageFile={git.stageFile}
+                    onUnstageFile={git.unstageFile}
+                    onStageAll={git.stageAll}
+                    onUnstageAll={git.unstageAll}
+                    onCommit={git.commit}
+                    onDiscardChanges={git.discardChanges}
+                    onGetLog={git.getLog}
+                    onClose={() => setSidebarVisible(false)}
+                    appBgColor={appBgColor}
+                    appTextColor={appTextColor}
+                  />
+                )}
+              </div>
 
-            {/* 侧边栏拖动条 */}
-            <div
-              className="w-px bg-gray-200/50 dark:bg-gray-700/50 hover:bg-gray-300/70 dark:hover:bg-gray-600/70 cursor-col-resize active:bg-blue-400/70 dark:active:bg-blue-500/70 transition-colors relative group"
-              onMouseDown={() => setIsDraggingSidebar(true)}
-            >
-              <div className="absolute inset-y-0 -left-2 -right-2" />
-            </div>
-          </>
+              {/* 侧边栏拖动条 */}
+              <div
+                className="w-px bg-gray-200/50 dark:bg-gray-700/50 hover:bg-gray-300/70 dark:hover:bg-gray-600/70 cursor-col-resize active:bg-blue-400/70 dark:active:bg-blue-500/70 transition-colors relative group"
+                onMouseDown={() => setIsDraggingSidebar(true)}
+              >
+                <div className="absolute inset-y-0 -left-2 -right-2" />
+              </div>
+            </>
           )}
 
           {/* 编辑器文本区域 */}
@@ -2119,7 +2184,7 @@ function App() {
             gitStatus={git.status}
             onEditorScroll={handleEditorScroll}
             previewVisible={previewVisible}
-            onTogglePreview={() => setPreviewVisible(!previewVisible)}
+            onTogglePreview={togglePreviewVisibility}
           />
         </section>
 
@@ -2136,156 +2201,144 @@ function App() {
         {/* 右侧：预览区 */}
         {previewVisible && (
           <section
-              ref={(el) => {
-                pdfContainerRef.current = el;
-                previewSectionRef.current = el;
-              }}
-              className="flex-1 h-full overflow-y-auto flex justify-center transition-colors duration-300 relative"
-              style={{ backgroundColor: previewBgColor }}
-              onClick={(e) => {
-                handlePreviewClick();
-                handlePreviewClickToJump(e);
-              }}
-            >
+            ref={(el) => {
+              pdfContainerRef.current = el;
+              previewSectionRef.current = el;
+            }}
+            className="flex-1 h-full overflow-y-auto flex justify-center transition-colors duration-300 relative"
+            style={{ backgroundColor: previewBgColor }}
+            onClick={(e) => {
+              handlePreviewClick();
+              handlePreviewClickToJump(e);
+            }}
+          >
 
-          {/* macOS 风格的预览模式指示器 */}
-          {showIndicator && (
-            <div className="absolute top-4 right-4 z-10 animate-fade-in">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-lg border border-gray-200/50 dark:border-gray-700/50 transition-all">
-                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
-                  {previewMode === 'markdown' ? '📝 Markdown' : '📄 PDF'}
-                </span>
+            {/* macOS 风格的预览模式指示器 */}
+            {showIndicator && (
+              <div className="absolute top-4 right-4 z-10 animate-fade-in">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-lg border border-gray-200/50 dark:border-gray-700/50 transition-all">
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                    {previewMode === 'markdown' ? '📝 Markdown' : '📄 PDF'}
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* 预览区颜色选择按钮 - 仅在 Markdown 模式下显示 */}
-          {previewMode === 'markdown' && (
-            <PreviewColorPicker
-              previewBgColor={previewBgColor}
-              previewBgColorIndex={previewBgColorIndex}
-              showMenu={showPreviewBgColorMenu}
-              onToggleMenu={() => setShowPreviewBgColorMenu(!showPreviewBgColorMenu)}
-              onColorSelect={(index) => {
-                setPreviewBgColorIndex(index);
-                setShowPreviewBgColorMenu(false);
-              }}
-              onReset={() => {
-                setPreviewBgColorIndex(null);
-                setShowPreviewBgColorMenu(false);
-              }}
-            />
-          )}
-
-          {previewMode === 'markdown' ? (
-            /* Markdown 预览模式 - 正常网页效果 */
-            <div className="w-full max-w-4xl p-6">
-              <article
-                className="prose max-w-none prose-headings:font-semibold"
-                style={{
-                  fontFamily: currentFontFamily.family,
-                  color: previewTextColor
+            {/* 预览区颜色选择按钮 - 仅在 Markdown 模式下显示 */}
+            {previewMode === 'markdown' && (
+              <PreviewColorPicker
+                previewBgColor={previewBgColor}
+                previewBgColorIndex={previewBgColorIndex}
+                showMenu={showPreviewBgColorMenu}
+                onToggleMenu={() => setShowPreviewBgColorMenu(!showPreviewBgColorMenu)}
+                onColorSelect={(index) => {
+                  setPreviewBgColorIndex(index);
+                  setShowPreviewBgColorMenu(false);
                 }}
-              >
-                <style>{`
+                onReset={() => {
+                  setPreviewBgColorIndex(null);
+                  setShowPreviewBgColorMenu(false);
+                }}
+              />
+            )}
+
+            {previewMode === 'markdown' ? (
+              /* Markdown 预览模式 - 正常网页效果 */
+              <div className="w-full max-w-4xl p-6">
+                <article
+                  className="prose max-w-none prose-headings:font-semibold"
+                  style={{
+                    fontFamily: currentFontFamily.family,
+                    color: previewTextColor
+                  }}
+                >
+                  <style>{`
                   .prose {
-                    font-size: ${
-                      currentFont.size === 'text-xs' ? '0.75rem' :
+                    font-size: ${currentFont.size === 'text-xs' ? '0.75rem' :
                       currentFont.size === 'text-sm' ? '0.875rem' :
-                      currentFont.size === 'text-base' ? '1rem' :
-                      currentFont.size === 'text-lg' ? '1.125rem' :
-                      '1.25rem'
+                        currentFont.size === 'text-base' ? '1rem' :
+                          currentFont.size === 'text-lg' ? '1.125rem' :
+                            '1.25rem'
                     } !important;
-                    line-height: ${
-                      currentFont.leading === 'leading-5' ? '1.25rem' :
+                    line-height: ${currentFont.leading === 'leading-5' ? '1.25rem' :
                       currentFont.leading === 'leading-6' ? '1.5rem' :
-                      currentFont.leading === 'leading-7' ? '1.75rem' :
-                      currentFont.leading === 'leading-8' ? '2rem' :
-                      '2.25rem'
+                        currentFont.leading === 'leading-7' ? '1.75rem' :
+                          currentFont.leading === 'leading-8' ? '2rem' :
+                            '2.25rem'
                     } !important;
                   }
                   .prose p {
                     margin-top: 0 !important;
-                    margin-bottom: ${
-                      currentFont.leading === 'leading-5' ? '0.625rem' :
+                    margin-bottom: ${currentFont.leading === 'leading-5' ? '0.625rem' :
                       currentFont.leading === 'leading-6' ? '0.75rem' :
-                      currentFont.leading === 'leading-7' ? '0.875rem' :
-                      currentFont.leading === 'leading-8' ? '1rem' :
-                      '1.125rem'
+                        currentFont.leading === 'leading-7' ? '0.875rem' :
+                          currentFont.leading === 'leading-8' ? '1rem' :
+                            '1.125rem'
                     } !important;
                   }
                   .prose h1 {
-                    font-size: ${
-                      currentFont.size === 'text-xs' ? '1.25rem' :
+                    font-size: ${currentFont.size === 'text-xs' ? '1.25rem' :
                       currentFont.size === 'text-sm' ? '1.5rem' :
-                      currentFont.size === 'text-base' ? '1.875rem' :
-                      currentFont.size === 'text-lg' ? '2.25rem' :
-                      '2.5rem'
+                        currentFont.size === 'text-base' ? '1.875rem' :
+                          currentFont.size === 'text-lg' ? '2.25rem' :
+                            '2.5rem'
                     } !important;
                     line-height: 1.2 !important;
-                    margin-top: ${
-                      currentFont.leading === 'leading-5' ? '0.875rem' :
+                    margin-top: ${currentFont.leading === 'leading-5' ? '0.875rem' :
                       currentFont.leading === 'leading-6' ? '1rem' :
-                      currentFont.leading === 'leading-7' ? '1.25rem' :
-                      currentFont.leading === 'leading-8' ? '1.5rem' :
-                      '1.75rem'
+                        currentFont.leading === 'leading-7' ? '1.25rem' :
+                          currentFont.leading === 'leading-8' ? '1.5rem' :
+                            '1.75rem'
                     } !important;
-                    margin-bottom: ${
-                      currentFont.leading === 'leading-5' ? '0.375rem' :
+                    margin-bottom: ${currentFont.leading === 'leading-5' ? '0.375rem' :
                       currentFont.leading === 'leading-6' ? '0.5rem' :
-                      currentFont.leading === 'leading-7' ? '0.625rem' :
-                      currentFont.leading === 'leading-8' ? '0.75rem' :
-                      '0.875rem'
+                        currentFont.leading === 'leading-7' ? '0.625rem' :
+                          currentFont.leading === 'leading-8' ? '0.75rem' :
+                            '0.875rem'
                     } !important;
                     color: inherit !important;
                   }
                   .prose h2 {
-                    font-size: ${
-                      currentFont.size === 'text-xs' ? '1.125rem' :
+                    font-size: ${currentFont.size === 'text-xs' ? '1.125rem' :
                       currentFont.size === 'text-sm' ? '1.25rem' :
-                      currentFont.size === 'text-base' ? '1.5rem' :
-                      currentFont.size === 'text-lg' ? '1.875rem' :
-                      '2.125rem'
+                        currentFont.size === 'text-base' ? '1.5rem' :
+                          currentFont.size === 'text-lg' ? '1.875rem' :
+                            '2.125rem'
                     } !important;
                     line-height: 1.2 !important;
-                    margin-top: ${
-                      currentFont.leading === 'leading-5' ? '0.75rem' :
+                    margin-top: ${currentFont.leading === 'leading-5' ? '0.75rem' :
                       currentFont.leading === 'leading-6' ? '0.875rem' :
-                      currentFont.leading === 'leading-7' ? '1rem' :
-                      currentFont.leading === 'leading-8' ? '1.25rem' :
-                      '1.5rem'
+                        currentFont.leading === 'leading-7' ? '1rem' :
+                          currentFont.leading === 'leading-8' ? '1.25rem' :
+                            '1.5rem'
                     } !important;
-                    margin-bottom: ${
-                      currentFont.leading === 'leading-5' ? '0.375rem' :
+                    margin-bottom: ${currentFont.leading === 'leading-5' ? '0.375rem' :
                       currentFont.leading === 'leading-6' ? '0.5rem' :
-                      currentFont.leading === 'leading-7' ? '0.625rem' :
-                      currentFont.leading === 'leading-8' ? '0.75rem' :
-                      '0.875rem'
+                        currentFont.leading === 'leading-7' ? '0.625rem' :
+                          currentFont.leading === 'leading-8' ? '0.75rem' :
+                            '0.875rem'
                     } !important;
                     color: inherit !important;
                   }
                   .prose h3 {
-                    font-size: ${
-                      currentFont.size === 'text-xs' ? '1rem' :
+                    font-size: ${currentFont.size === 'text-xs' ? '1rem' :
                       currentFont.size === 'text-sm' ? '1.125rem' :
-                      currentFont.size === 'text-base' ? '1.25rem' :
-                      currentFont.size === 'text-lg' ? '1.5rem' :
-                      '1.75rem'
+                        currentFont.size === 'text-base' ? '1.25rem' :
+                          currentFont.size === 'text-lg' ? '1.5rem' :
+                            '1.75rem'
                     } !important;
                     line-height: 1.2 !important;
-                    margin-top: ${
-                      currentFont.leading === 'leading-5' ? '0.625rem' :
+                    margin-top: ${currentFont.leading === 'leading-5' ? '0.625rem' :
                       currentFont.leading === 'leading-6' ? '0.75rem' :
-                      currentFont.leading === 'leading-7' ? '0.875rem' :
-                      currentFont.leading === 'leading-8' ? '1rem' :
-                      '1.125rem'
+                        currentFont.leading === 'leading-7' ? '0.875rem' :
+                          currentFont.leading === 'leading-8' ? '1rem' :
+                            '1.125rem'
                     } !important;
-                    margin-bottom: ${
-                      currentFont.leading === 'leading-5' ? '0.25rem' :
+                    margin-bottom: ${currentFont.leading === 'leading-5' ? '0.25rem' :
                       currentFont.leading === 'leading-6' ? '0.375rem' :
-                      currentFont.leading === 'leading-7' ? '0.5rem' :
-                      currentFont.leading === 'leading-8' ? '0.625rem' :
-                      '0.75rem'
+                        currentFont.leading === 'leading-7' ? '0.5rem' :
+                          currentFont.leading === 'leading-8' ? '0.625rem' :
+                            '0.75rem'
                     } !important;
                     color: inherit !important;
                   }
@@ -2321,13 +2374,42 @@ function App() {
                   .prose pre {
                     margin-top: ${currentFont.leading === 'leading-6' ? '0.75rem' : currentFont.leading === 'leading-7' ? '0.875rem' : '1rem'} !important;
                     margin-bottom: ${currentFont.leading === 'leading-6' ? '0.75rem' : currentFont.leading === 'leading-7' ? '0.875rem' : '1rem'} !important;
+                    padding: 0.75rem 1rem !important;
+                    overflow-x: auto !important;
+                    font-size: ${currentFont.size === 'text-xs' ? '0.75rem' :
+                      currentFont.size === 'text-sm' ? '0.875rem' :
+                        currentFont.size === 'text-base' ? '1rem' :
+                          currentFont.size === 'text-lg' ? '1.125rem' :
+                            '1.25rem'
+                    } !important;
+                    line-height: ${currentFont.leading === 'leading-5' ? '1.25rem' :
+                      currentFont.leading === 'leading-6' ? '1.5rem' :
+                        currentFont.leading === 'leading-7' ? '1.75rem' :
+                          currentFont.leading === 'leading-8' ? '2rem' :
+                            '2.25rem'
+                    } !important;
                   }
                   .prose code {
                     font-size: ${currentFont.size === 'text-sm' ? '0.8125rem' : currentFont.size === 'text-base' ? '0.9375rem' : '1.0625rem'} !important;
                     color: inherit !important;
                   }
                   .prose pre code {
+                    font-size: inherit !important;
                     color: inherit !important;
+                  }
+                  
+                  /* 强制覆盖 Tailwind Typography 的默认样式 */
+                  .prose > pre {
+                    font-size: ${currentFont.size === 'text-xs' ? '0.75rem' :
+                      currentFont.size === 'text-sm' ? '0.875rem' :
+                        currentFont.size === 'text-base' ? '1rem' :
+                          currentFont.size === 'text-lg' ? '1.125rem' :
+                            '1.25rem'
+                    } !important;
+                  }
+                  
+                  .prose > pre > code {
+                    font-size: inherit !important;
                   }
 
                   /* KaTeX 数学公式样式 */
@@ -2341,33 +2423,33 @@ function App() {
                     color: inherit !important;
                   }
                 `}</style>
-                {renderedMarkdown}
-              </article>
-            </div>
-          ) : (
-            /* PDF 预览模式 - LaTeX 论文风格的 A4 页面，带动态缩放 */
-            <div className="pdf-preview-container" style={{
-              width: '100%',
-              height: '100%',
-            }}>
-              <div
-                id="print-target"
-                style={{
-                  width: '210mm',
-                  minHeight: '297mm',
-                  padding: '20mm 25mm',
-                  fontFamily: currentFontFamily.family,
-                  fontSize: currentFont.size === 'text-sm' ? '10pt' : currentFont.size === 'text-base' ? '11pt' : '12pt',
-                  lineHeight: '1.5',
-                  color: '#000',
-                  backgroundColor: '#ffffff',
-                  transform: `scale(${pdfScale})`,
-                  transformOrigin: 'top left',
-                  boxSizing: 'border-box',
-                  transition: 'transform 0.2s ease-out',
-                }}
-              >
-              <style>{`
+                  {renderedMarkdown}
+                </article>
+              </div>
+            ) : (
+              /* PDF 预览模式 - LaTeX 论文风格的 A4 页面，带动态缩放 */
+              <div className="pdf-preview-container" style={{
+                width: '100%',
+                height: '100%',
+              }}>
+                <div
+                  id="print-target"
+                  style={{
+                    width: '210mm',
+                    minHeight: '297mm',
+                    padding: '20mm 25mm',
+                    fontFamily: currentFontFamily.family,
+                    fontSize: currentFont.size === 'text-sm' ? '10pt' : currentFont.size === 'text-base' ? '11pt' : '12pt',
+                    lineHeight: '1.5',
+                    color: '#000',
+                    backgroundColor: '#ffffff',
+                    transform: `scale(${pdfScale})`,
+                    transformOrigin: 'top left',
+                    boxSizing: 'border-box',
+                    transition: 'transform 0.2s ease-out',
+                  }}
+                >
+                  <style>{`
                 #print-target {
                   background-color: #ffffff !important;
                 }
@@ -2474,12 +2556,12 @@ function App() {
                   margin: 16pt 0;
                 }
               `}</style>
-              <article>
-                {renderedMarkdown}
-              </article>
+                  <article>
+                    {renderedMarkdown}
+                  </article>
+                </div>
               </div>
-            </div>
-          )}
+            )}
           </section>
         )}
 
