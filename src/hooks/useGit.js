@@ -10,6 +10,7 @@ export function useGit(repositoryPath) {
   const [branch, setBranch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isGitRepo, setIsGitRepo] = useState(false); // New state to track if it's a git repo
 
   // 执行 git 命令
   const executeGitCommand = useCallback(async (args) => {
@@ -30,7 +31,8 @@ export function useGit(repositoryPath) {
 
       return output.stdout;
     } catch (err) {
-      console.error('Git command error:', err);
+      // Silently handle git errors (likely not a git repository)
+      console.debug('Git command failed:', err.message);
       throw err;
     }
   }, [repositoryPath]);
@@ -81,9 +83,13 @@ export function useGit(repositoryPath) {
 
       setStatus(statusData);
       setBranch(branchName);
+      setIsGitRepo(true);
       return statusData;
     } catch (err) {
-      setError(err.message);
+      // Silently ignore git errors for non-git repositories
+      console.debug('Not a git repository:', repositoryPath);
+      setStatus(null);
+      setIsGitRepo(false);
       return null;
     } finally {
       setIsLoading(false);

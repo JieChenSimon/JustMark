@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import SearchReplace from './SearchReplace';
+import { useImagePaste } from '../hooks/useImagePaste';
 
 /**
  * 编辑器区域组件
@@ -20,10 +21,12 @@ const EditorArea = forwardRef(({
   gitStatus,
   onEditorScroll,
   previewVisible,
-  onTogglePreview
+  onTogglePreview,
+  onImagePasted
 }, ref) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const textareaRef = useRef(null);
+  const { handlePaste: handleImagePaste } = useImagePaste(currentFolder, currentFilePath);
 
   // 暴露方法给父组件
   useImperativeHandle(ref, () => ({
@@ -42,6 +45,42 @@ const EditorArea = forwardRef(({
       const textarea = textareaRef.current;
       const scrollPercentage = textarea.scrollTop / (textarea.scrollHeight - textarea.clientHeight);
       onEditorScroll(scrollPercentage);
+    }
+  };
+
+  // 处理粘贴事件（检测图片）
+  const handlePaste = async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    // 查找图片项
+    for (const item of items) {
+      if (item.type.indexOf('image') !== -1) {
+        e.preventDefault(); // 阻止默认粘贴行为
+
+        const blob = item.getAsFile();
+        if (!blob) continue;
+
+        const reader = new FileReader();
+
+        reader.onload = async (event) => {
+          const base64String = event.target.result;
+          // Remove data:image/png;base64, prefix
+          const base64Data = base64String.split(',')[1];
+
+          // Save image and get relative path
+          const relativePath = await handleImagePaste(base64Data);
+
+          if (relativePath && onImagePasted) {
+            // Insert markdown image syntax at cursor position
+            const imageMarkdown = `![](${relativePath})`;
+            onImagePasted(imageMarkdown, textareaRef.current);
+          }
+        };
+
+        reader.readAsDataURL(blob);
+        break; // Only handle first image
+      }
     }
   };
 
@@ -70,6 +109,7 @@ const EditorArea = forwardRef(({
         value={markdown}
         onChange={onMarkdownChange}
         onScroll={handleScroll}
+        onPaste={handlePaste}
         placeholder="JustMark..."
         spellCheck="false"
       />
@@ -96,11 +136,10 @@ const EditorArea = forwardRef(({
             {/* 预览切换按钮 */}
             <button
               onClick={onTogglePreview}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg backdrop-blur-sm shadow-md transition-all active:scale-95 ${
-                previewVisible
-                  ? 'bg-blue-500/20 dark:bg-blue-500/30 border border-blue-400/50 dark:border-blue-400/50'
-                  : 'bg-gray-100/80 dark:bg-gray-800/80 hover:bg-gray-200/90 dark:hover:bg-gray-700/90 border border-gray-300/50 dark:border-gray-600/50'
-              }`}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg backdrop-blur-sm shadow-md transition-all active:scale-95 ${previewVisible
+                ? 'bg-blue-500/20 dark:bg-blue-500/30 border border-blue-400/50 dark:border-blue-400/50'
+                : 'bg-gray-100/80 dark:bg-gray-800/80 hover:bg-gray-200/90 dark:hover:bg-gray-700/90 border border-gray-300/50 dark:border-gray-600/50'
+                }`}
               title={previewVisible ? 'Hide Preview' : 'Show Preview'}
             >
               <svg className={`w-4 h-4 ${previewVisible ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -122,11 +161,10 @@ const EditorArea = forwardRef(({
                   onToggleSidebar(true);
                 }
               }}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg backdrop-blur-sm shadow-md transition-all active:scale-95 relative ${
-                sidebarVisible && sidebarView === 'git'
-                  ? 'bg-blue-500/20 dark:bg-blue-500/30 border border-blue-400/50 dark:border-blue-400/50'
-                  : 'bg-gray-100/80 dark:bg-gray-800/80 hover:bg-gray-200/90 dark:hover:bg-gray-700/90 border border-gray-300/50 dark:border-gray-600/50'
-              }`}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg backdrop-blur-sm shadow-md transition-all active:scale-95 relative ${sidebarVisible && sidebarView === 'git'
+                ? 'bg-blue-500/20 dark:bg-blue-500/30 border border-blue-400/50 dark:border-blue-400/50'
+                : 'bg-gray-100/80 dark:bg-gray-800/80 hover:bg-gray-200/90 dark:hover:bg-gray-700/90 border border-gray-300/50 dark:border-gray-600/50'
+                }`}
               title="Source Control"
             >
               <svg className={`w-4 h-4 ${sidebarVisible && sidebarView === 'git' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -146,11 +184,10 @@ const EditorArea = forwardRef(({
                 onSetSidebarView('files');
                 onToggleSidebar(!sidebarVisible);
               }}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg backdrop-blur-sm shadow-md transition-all active:scale-95 ${
-                sidebarVisible && sidebarView === 'files'
-                  ? 'bg-blue-500/20 dark:bg-blue-500/30 border border-blue-400/50 dark:border-blue-400/50'
-                  : 'bg-gray-100/80 dark:bg-gray-800/80 hover:bg-gray-200/90 dark:hover:bg-gray-700/90 border border-gray-300/50 dark:border-gray-600/50'
-              }`}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg backdrop-blur-sm shadow-md transition-all active:scale-95 ${sidebarVisible && sidebarView === 'files'
+                ? 'bg-blue-500/20 dark:bg-blue-500/30 border border-blue-400/50 dark:border-blue-400/50'
+                : 'bg-gray-100/80 dark:bg-gray-800/80 hover:bg-gray-200/90 dark:hover:bg-gray-700/90 border border-gray-300/50 dark:border-gray-600/50'
+                }`}
               title={sidebarVisible && sidebarView === 'files' ? 'Hide Explorer' : 'Show Explorer'}
             >
               <svg className={`w-4 h-4 ${sidebarVisible && sidebarView === 'files' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">

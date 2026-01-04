@@ -9,11 +9,13 @@ import jsPDF from 'jspdf';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile, writeFile, readTextFile, readDir, remove, mkdir } from '@tauri-apps/plugin-fs';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { useGit } from './hooks/useGit';
 import { GitPanel } from './components/GitPanel';
 import PreviewColorPicker from './components/PreviewColorPicker';
 import EditorArea from './components/EditorArea';
 import ConfirmDialog from './components/ConfirmDialog';
+import { remarkObsidianImage } from './utils/remarkObsidianImage';
 
 // ==============================================
 // 🛠️ 核心配置
@@ -496,6 +498,10 @@ function App() {
   const [inlineCreate, setInlineCreate] = useState(null); // { parentPath: string, type: 'file'|'folder', value: string }
   const inlineCreateInputRef = useRef(null);
 
+  // Obsidian 兼容性：attachment 文件夹配置
+  const [attachmentFolder, setAttachmentFolder] = useState(() => loadSavedState('attachmentFolder', '00- Attachment'));
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+
   // 保存状态到 localStorage
   useEffect(() => {
     saveState('isDarkMode', isDarkMode);
@@ -554,6 +560,10 @@ function App() {
   useEffect(() => {
     saveState('editorWidth', editorWidth);
   }, [editorWidth]);
+
+  useEffect(() => {
+    saveState('attachmentFolder', attachmentFolder);
+  }, [attachmentFolder]);
 
   // 定义 loadFolderContents 函数需要在这里之前声明，所以我们移除这个 useEffect
   // 恢复逻辑将在 loadFolderContents 定义之后添加
@@ -1214,13 +1224,8 @@ function App() {
       setCurrentFolder(folderPath);
       const entries = await readDir(folderPath);
 
-      // 只显示 markdown 文件和子文件夹
+      // Show all files and folders (remove .md filter to show images too)
       const filtered = entries
-        .filter(entry => {
-          if (entry.isDirectory) return true;
-          const name = entry.name.toLowerCase();
-          return name.endsWith('.md') || name.endsWith('.markdown') || name.endsWith('.txt');
-        })
         .sort((a, b) => {
           // 文件夹在前，文件在后
           if (a.isDirectory && !b.isDirectory) return -1;
@@ -1241,11 +1246,6 @@ function App() {
     try {
       const entries = await readDir(folderPath);
       return entries
-        .filter(entry => {
-          if (entry.isDirectory) return true;
-          const name = entry.name.toLowerCase();
-          return name.endsWith('.md') || name.endsWith('.markdown') || name.endsWith('.txt');
-        })
         .sort((a, b) => {
           if (a.isDirectory && !b.isDirectory) return -1;
           if (!a.isDirectory && b.isDirectory) return 1;
@@ -1429,6 +1429,28 @@ function App() {
     setHasUnsavedChanges(true);
   };
 
+  // 处理图片粘贴：在光标位置插入图片 Markdown 语法
+  const handleImagePasted = (imageMarkdown, textareaElement) => {
+    if (!textareaElement) return;
+
+    const start = textareaElement.selectionStart;
+    const end = textareaElement.selectionEnd;
+    const currentText = markdown;
+
+    // 在光标位置插入图片 markdown
+    const newText = currentText.substring(0, start) + imageMarkdown + currentText.substring(end);
+
+    setMarkdown(newText);
+    setHasUnsavedChanges(true);
+
+    // 将光标移动到插入内容之后
+    setTimeout(() => {
+      textareaElement.focus();
+      const newCursorPos = start + imageMarkdown.length;
+      textareaElement.setSelectionRange(newCursorPos, newCursorPos);
+    }, 0);
+  };
+
   // 字体变大
   const increaseFontSize = () => {
     setFontIndex((prev) => Math.min(prev + 1, FONT_OPTIONS.length - 1));
@@ -1554,17 +1576,72 @@ function App() {
   const previewTextColor = previewColor ? previewColor.text : appTextColor;
 
   // 使用 useMemo 缓存 markdown 渲染内容，避免主题切换时重新渲染
-  const renderedMarkdown = useMemo(() => (
-    <ReactMarkdown
-      remarkPlugins={[
-        remarkMath,
-        remarkGfm
-      ]}
-      rehypePlugins={[rehypeKatex]}
-    >
-      {markdown}
-    </ReactMarkdown>
-  ), [markdown]);
+  const renderedMarkdown = useMemo(() => {
+    // Pre-process markdown to convert Obsidian syntax to standard markdown
+    const processedMarkdown = markdown.replace(
+      /!\[\[([^\]]+\.(png|jpg|jpeg|gif|webp|svg|bmp|ico))\]\]/gi,
+      (match, filename) => {
+        // URL encode the entire path to handle spaces and special characters
+        const imagePath = `${attachmentFolder}/${filename}`;
+        // Encode each path component separately to preserve the forward slash
+        const encodedPath = imagePath.split('/').map(part => encodeURIComponent(part)).join('/');
+        console.log('🖼️ Obsidian image found:', { original: match, filename, imagePath, encodedPath });
+        return `![](${encodedPath})`;
+      }
+    );
+
+    // Debug: show a sample of processedMarkdown
+    if (processedMarkdown !== markdown) {
+      const sample = processedMarkdown.substring(0, 500);
+      console.log('📝 Processed markdown sample:', sample);
+    }
+
+
+    // Custom img component to handle local image paths
+    const components = {
+      img: ({ node, src, alt, ...props }) => {
+        let imageSrc = src;
+
+        // Handle local paths (not HTTP, data, or asset URLs)
+        if (src && !src.startsWith('http') && !src.startsWith('data:') && !src.startsWith('asset://')) {
+          const basePath = currentFolder ||
+            (currentFilePath ? currentFilePath.substring(0, currentFilePath.lastIndexOf('/')) : '');
+
+          if (basePath) {
+            // Decode URL-encoded path first
+            const decodedSrc = decodeURIComponent(src);
+            const cleanSrc = decodedSrc.startsWith('./') ? decodedSrc.substring(2) : decodedSrc;
+            const absolutePath = `${basePath}/${cleanSrc}`;
+
+            try {
+              imageSrc = convertFileSrc(absolutePath);
+              console.log('🖼️ Image transformed:', { original: src, decoded: decodedSrc, absolute: absolutePath, asset: imageSrc });
+            } catch (error) {
+              console.error('❌ Image transform failed:', error);
+            }
+          }
+        }
+
+        return <img src={imageSrc} alt={alt || ''} {...props} />;
+      }
+    };
+
+    return (
+      <ReactMarkdown
+        remarkPlugins={[remarkMath, remarkGfm]}
+        rehypePlugins={[
+          [rehypeKatex, {
+            strict: false,
+            trust: true,
+            throwOnError: false
+          }]
+        ]}
+        components={components}
+      >
+        {processedMarkdown}
+      </ReactMarkdown>
+    );
+  }, [markdown, currentFolder, currentFilePath, attachmentFolder]);
 
   // 应用启动时恢复上次打开的文件和文件夹
   useEffect(() => {
@@ -2033,6 +2110,19 @@ function App() {
               {previewMode === 'markdown' ? '📄' : '📝'}
             </button>
 
+            {/* Settings按钮 */}
+            <button
+              onClick={() => setShowSettingsDialog(true)}
+              className="w-6 h-6 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800 transition-all active:scale-95"
+              title="Settings"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+
+            {/* 黑暗模式切换按钮 */}
             <button
               onClick={toggleTheme}
               className="w-6 h-6 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800 transition-all active:scale-95 text-[10px]"
@@ -2185,6 +2275,7 @@ function App() {
             onEditorScroll={handleEditorScroll}
             previewVisible={previewVisible}
             onTogglePreview={togglePreviewVisibility}
+            onImagePasted={handleImagePasted}
           />
         </section>
 
@@ -2389,13 +2480,31 @@ function App() {
                             '2.25rem'
                     } !important;
                   }
-                  .prose code {
-                    font-size: ${currentFont.size === 'text-sm' ? '0.8125rem' : currentFont.size === 'text-base' ? '0.9375rem' : '1.0625rem'} !important;
-                    color: inherit !important;
+                  /* 移除 Tailwind Typography 默认的反引号 */
+                  .prose code::before,
+                  .prose code::after {
+                    content: none !important;
                   }
+
+                  /* 内联代码样式 - 不在 pre 中的 code */
+                  .prose :not(pre) > code {
+                    background-color: rgba(175, 184, 193, 0.2) !important;
+                    padding: 0.2em 0.4em !important;
+                    border-radius: 3px !important;
+                    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+                    font-size: 0.875em !important;
+                    font-weight: 400 !important;
+                    color: #eb5757 !important;
+                    border: 1px solid rgba(175, 184, 193, 0.3) !important;
+                  }
+
+                  /* 代码块中的 code */
                   .prose pre code {
                     font-size: inherit !important;
                     color: inherit !important;
+                    background-color: transparent !important;
+                    padding: 0 !important;
+                    border: none !important;
                   }
                   
                   /* 强制覆盖 Tailwind Typography 的默认样式 */
@@ -2579,6 +2688,57 @@ function App() {
         isDangerous={true}
         position={confirmDialog.position}
       />
+
+      {/* Settings Dialog */}
+      {showSettingsDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-md p-6 m-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Settings
+              </h2>
+              <button
+                onClick={() => setShowSettingsDialog(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Attachment Folder
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  Folder name for Obsidian-style image references (e.g., ![[image.png]])
+                </p>
+                <input
+                  type="text"
+                  value={attachmentFolder}
+                  onChange={(e) => setAttachmentFolder(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="00- Attachment"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Common folders: "00- Attachment", "attachments", "assets", "images"
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowSettingsDialog(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
