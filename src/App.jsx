@@ -154,6 +154,7 @@ function InlineCreateRow({
         className="flex-1 bg-transparent border-b border-gray-300 dark:border-gray-600 text-[11px] text-gray-800 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
         placeholder={type === 'folder' ? 'New folder' : 'New file'}
         autoComplete="off"
+        autoFocus
       />
     </div>
   );
@@ -166,6 +167,7 @@ function FileTreeItem({
   level,
   currentFilePath,
   expandedFolders,
+  folderRefreshTimestamps,
   onToggleFolder,
   onOpenFile,
   getSubfolderContents,
@@ -187,7 +189,10 @@ function FileTreeItem({
   const indent = level * 12;
 
   useEffect(() => {
-    if (entry.isDirectory && isExpanded && children.length === 0) {
+    // 检查是否有刷新信号
+    const shouldLoad = entry.isDirectory && isExpanded && (children.length === 0 || (folderRefreshTimestamps && folderRefreshTimestamps[fullPath]));
+    
+    if (shouldLoad) {
       setIsLoading(true);
       getSubfolderContents(fullPath).then(contents => {
         setChildren(contents);
@@ -197,7 +202,7 @@ function FileTreeItem({
       // 当折叠时清空子内容，这样下次展开时会重新加载
       setChildren([]);
     }
-  }, [isExpanded]);
+  }, [isExpanded, folderRefreshTimestamps && folderRefreshTimestamps[fullPath]]);
 
   const handleClick = () => {
     console.log('点击文件/文件夹:', entry.name, '完整路径:', fullPath, '是否为目录:', entry.isDirectory);
@@ -337,6 +342,7 @@ function FileTreeItem({
                 level={level + 1}
                 currentFilePath={currentFilePath}
                 expandedFolders={expandedFolders}
+                folderRefreshTimestamps={folderRefreshTimestamps}
                 onToggleFolder={onToggleFolder}
                 onOpenFile={onOpenFile}
                 getSubfolderContents={getSubfolderContents}
@@ -433,6 +439,8 @@ function App() {
     const saved = loadSavedState('expandedFolders', []);
     return new Set(saved);
   });
+  // 文件夹刷新时间戳，用于强制刷新子组件
+  const [folderRefreshTimestamps, setFolderRefreshTimestamps] = useState({});
   const indicatorTimeoutRef = useRef(null);
   const warningTimeoutRef = useRef(null);
 
@@ -1055,8 +1063,9 @@ function App() {
       fileName = fileName + '.md';
     }
 
-    if (!/^[\w\-. ]+$/.test(fileName)) {
-      alert('❌ 名称包含不允许的字符！只能使用字母、数字、下划线、连字符、点和空格。');
+    // 检查非法字符 (Windows/Unix 通用限制)
+    if (/[<>:"/\\|?*]/.test(fileName)) {
+      alert('❌ 名称包含不允许的字符！请避免使用 < > : " / \\ | ? *');
       return;
     }
 
@@ -1294,21 +1303,11 @@ function App() {
         setFolderContents(filtered);
       }
 
-      // 如果文件夹已展开，刷新它
-      if (expandedFolders.has(folderPath)) {
-        setExpandedFolders(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(folderPath);
-          return newSet;
-        });
-        setTimeout(() => {
-          setExpandedFolders(prev => {
-            const newSet = new Set(prev);
-            newSet.add(folderPath);
-            return newSet;
-          });
-        }, 0);
-      }
+      // 更新刷新时间戳，通知子组件刷新
+      setFolderRefreshTimestamps(prev => ({
+        ...prev,
+        [folderPath]: Date.now()
+      }));
     } catch (error) {
       console.error('刷新文件夹失败:', error);
     }
@@ -2214,6 +2213,7 @@ function App() {
                           level={0}
                           currentFilePath={currentFilePath}
                           expandedFolders={expandedFolders}
+                          folderRefreshTimestamps={folderRefreshTimestamps}
                           onToggleFolder={toggleFolder}
                           onOpenFile={handleOpenFileFromSidebar}
                           getSubfolderContents={getSubfolderContents}
