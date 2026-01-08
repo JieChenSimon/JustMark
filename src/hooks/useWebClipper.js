@@ -56,7 +56,49 @@ export function useWebClipper() {
     }, []);
 
     /**
+     * Insert text at selection using execCommand to support undo
+     * Falls back to direct manipulation if execCommand fails
+     */
+    const insertTextWithUndo = (textarea, text) => {
+        // Focus the textarea first
+        textarea.focus();
+
+        // Try using execCommand for undo support
+        // This is deprecated but still works in most browsers and maintains undo stack
+        const success = document.execCommand('insertText', false, text);
+
+        if (!success) {
+            // Fallback: Use InputEvent (modern approach)
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+
+            // Create and dispatch an InputEvent
+            const inputEvent = new InputEvent('beforeinput', {
+                inputType: 'insertText',
+                data: text,
+                bubbles: true,
+                cancelable: true,
+            });
+
+            const dispatched = textarea.dispatchEvent(inputEvent);
+
+            if (!dispatched || inputEvent.defaultPrevented) {
+                // Last resort: direct value manipulation (no undo support)
+                const currentValue = textarea.value;
+                textarea.value = currentValue.substring(0, start) + text + currentValue.substring(end);
+
+                // Trigger input event for React state sync
+                const event = new Event('input', { bubbles: true });
+                textarea.dispatchEvent(event);
+            }
+        }
+
+        return true;
+    };
+
+    /**
      * Clips URL from selected text and replaces it in the textarea
+     * Uses execCommand to maintain undo history
      * @param {HTMLTextAreaElement} textareaElement - The textarea element
      * @param {string} currentMarkdown - Current markdown content
      * @param {Function} setMarkdown - Function to update markdown
@@ -85,13 +127,15 @@ export function useWebClipper() {
         try {
             const clippedContent = await clipUrl(selectedText);
 
-            // Replace selection with clipped content
-            const newMarkdown =
-                currentMarkdown.substring(0, start) +
-                clippedContent +
-                currentMarkdown.substring(end);
+            // Ensure the selection is still valid
+            textareaElement.focus();
+            textareaElement.setSelectionRange(start, end);
 
-            setMarkdown(newMarkdown);
+            // Use insertTextWithUndo for undo support
+            insertTextWithUndo(textareaElement, clippedContent);
+
+            // Update React state to sync
+            setMarkdown(textareaElement.value);
             setHasUnsavedChanges(true);
 
             // Move cursor to end of inserted content
