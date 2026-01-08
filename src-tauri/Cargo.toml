@@ -26,5 +26,8 @@ tauri-plugin-shell = "2.3.3"
 tauri-plugin-dialog = "2.0"
 tauri-plugin-fs = "2.0"
 base64 = "0.21"
+reqwest = { version = "0.12", features = ["default-tls", "gzip", "brotli", "deflate"] }
+tokio = { version = "1", features = ["full"] }
+encoding_rs = "0.8"
 
 

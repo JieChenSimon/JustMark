@@ -10,6 +10,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@mozilla/readability": "^0.6.0",
     "@tauri-apps/api": "^2.9.0",
     "@tauri-apps/plugin-dialog": "^2.4.2",
     "@tauri-apps/plugin-fs": "^2.4.4",
@@ -27,6 +28,8 @@
     "remark-math": "^6.0.0",
     "sharp": "^0.34.5",
     "simple-git": "^3.30.0",
+    "turndown": "^7.2.2",
+    "turndown-plugin-gfm": "^1.0.2",
     "unist-util-visit": "^5.0.0"
   },
   "devDependencies": {

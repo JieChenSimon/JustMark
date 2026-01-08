@@ -1,4 +1,5 @@
 mod save_image_command;
+mod web_clipper_command;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -8,7 +9,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
-            save_image_command::save_image_from_clipboard
+            save_image_command::save_image_from_clipboard,
+            web_clipper_command::fetch_url_content
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

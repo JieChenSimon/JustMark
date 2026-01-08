@@ -36,7 +36,8 @@ const EditorArea = forwardRef(({
         const maxScroll = textarea.scrollHeight - textarea.clientHeight;
         textarea.scrollTop = maxScroll * percentage;
       }
-    }
+    },
+    getTextareaElement: () => textareaRef.current
   }));
 
   // 处理编辑器滚动事件
