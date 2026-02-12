@@ -7,9 +7,10 @@ import 'katex/dist/katex.min.css';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { writeTextFile, writeFile, readTextFile, readDir, remove, mkdir } from '@tauri-apps/plugin-fs';
+import { writeTextFile, writeFile, readTextFile, readDir, remove, mkdir, rename } from '@tauri-apps/plugin-fs';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { useGit } from './hooks/useGit';
 import { useWebClipper } from './hooks/useWebClipper';
 import { GitPanel } from './components/GitPanel';
@@ -175,6 +176,8 @@ function FileTreeItem({
   onStartInlineCreate,
   onDeleteEntry,
   onSelectEntry,
+  onRenameEntry,
+  onRevealInFinder,
   inlineCreate,
   inlineInputRef,
   onInlineChange,
@@ -184,6 +187,9 @@ function FileTreeItem({
   const [children, setChildren] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(entry.name);
+  const renameInputRef = useRef(null);
   const fullPath = basePath + '/' + entry.name;
   const isExpanded = expandedFolders.has(fullPath);
   const isSelected = currentFilePath === fullPath;
@@ -269,9 +275,42 @@ function FileTreeItem({
         <span className={`flex-shrink-0 ${isSelected ? 'opacity-100' : 'opacity-70'}`}>
           {entry.isDirectory ? '📁' : '📄'}
         </span>
-        <span className={`truncate ${isSelected ? 'font-medium' : 'font-normal'}`}>
-          {entry.name}
-        </span>
+        {isRenaming ? (
+          <input
+            ref={renameInputRef}
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                const trimmed = renameValue.trim();
+                if (trimmed && trimmed !== entry.name) {
+                  onRenameEntry(fullPath, trimmed);
+                }
+                setIsRenaming(false);
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                setRenameValue(entry.name);
+                setIsRenaming(false);
+              }
+            }}
+            onBlur={() => {
+              const trimmed = renameValue.trim();
+              if (trimmed && trimmed !== entry.name) {
+                onRenameEntry(fullPath, trimmed);
+              }
+              setIsRenaming(false);
+            }}
+            className="flex-1 bg-transparent border-b border-blue-500 dark:border-blue-400 text-[11px] text-gray-800 dark:text-gray-100 outline-none"
+            autoComplete="off"
+          />
+        ) : (
+          <span className={`truncate ${isSelected ? 'font-medium' : 'font-normal'}`}>
+            {entry.name}
+          </span>
+        )}
       </button>
 
       {/* macOS 风格的右键菜单 - 更紧凑 */}
@@ -281,7 +320,7 @@ function FileTreeItem({
           style={{
             top: `${Math.min(contextMenu.y, window.innerHeight - 100)}px`,
             left: `${contextMenu.x}px`,
-            width: '100px'
+            width: '140px'
           }}
         >
           {contextMenu.type === 'folder' && (
@@ -314,11 +353,48 @@ function FileTreeItem({
             </>
           )}
           <button
+            onClick={() => {
+              setRenameValue(entry.name);
+              setIsRenaming(true);
+              setContextMenu(null);
+              setTimeout(() => {
+                if (renameInputRef.current) {
+                  renameInputRef.current.focus();
+                  const dotIndex = entry.name.lastIndexOf('.');
+                  if (!entry.isDirectory && dotIndex > 0) {
+                    renameInputRef.current.setSelectionRange(0, dotIndex);
+                  } else {
+                    renameInputRef.current.select();
+                  }
+                }
+              }, 50);
+            }}
+            className="w-full px-2 py-1 text-left text-[10px] font-medium text-gray-700 dark:text-gray-200 hover:bg-blue-500 hover:text-white dark:hover:bg-blue-600 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span>Rename</span>
+          </button>
+          <button
+            onClick={() => {
+              onRevealInFinder(fullPath);
+              setContextMenu(null);
+            }}
+            className="w-full px-2 py-1 text-left text-[10px] font-medium text-gray-700 dark:text-gray-200 hover:bg-blue-500 hover:text-white dark:hover:bg-blue-600 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            <span>Reveal in Finder</span>
+          </button>
+          <div className="h-px bg-gray-200/50 dark:bg-gray-700/50 my-0.5 mx-1" />
+          <button
             onClick={(e) => {
               onDeleteEntry(fullPath, e);
               setContextMenu(null);
             }}
-            className="w-full px-2 py-1 text-left text-[10px] font-medium text-gray-700 dark:text-gray-200 hover:bg-blue-500 hover:text-white dark:hover:bg-blue-600 transition-colors flex items-center gap-2"
+            className="w-full px-2 py-1 text-left text-[10px] font-medium text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white dark:hover:bg-red-600 transition-colors flex items-center gap-2"
           >
             <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3H4v2h16V7h-3z" />
@@ -349,6 +425,8 @@ function FileTreeItem({
                 getSubfolderContents={getSubfolderContents}
                 onStartInlineCreate={onStartInlineCreate}
                 onDeleteEntry={onDeleteEntry}
+                onRenameEntry={onRenameEntry}
+                onRevealInFinder={onRevealInFinder}
                 inlineCreate={inlineCreate}
                 inlineInputRef={inlineInputRef}
                 onInlineChange={onInlineChange}
@@ -1318,6 +1396,57 @@ function App() {
     }
   };
 
+  // 重命名文件或文件夹
+  const handleRenameEntry = async (oldPath, newName) => {
+    try {
+      const lastSlashIndex = oldPath.lastIndexOf('/');
+      const parentPath = lastSlashIndex > 0 ? oldPath.substring(0, lastSlashIndex) : currentFolder;
+      const newPath = parentPath + '/' + newName;
+
+      await rename(oldPath, newPath);
+
+      // 如果重命名的是当前打开的文件，更新路径
+      if (currentFilePath === oldPath) {
+        setCurrentFilePath(newPath);
+      } else if (currentFilePath && currentFilePath.startsWith(oldPath + '/')) {
+        // 如果重命名的是当前打开文件的父文件夹
+        setCurrentFilePath(currentFilePath.replace(oldPath, newPath));
+      }
+
+      // 更新展开的文件夹集合
+      setExpandedFolders(prev => {
+        const newSet = new Set();
+        prev.forEach(path => {
+          if (path === oldPath) {
+            newSet.add(newPath);
+          } else if (path.startsWith(oldPath + '/')) {
+            newSet.add(path.replace(oldPath, newPath));
+          } else {
+            newSet.add(path);
+          }
+        });
+        return newSet;
+      });
+
+      // 刷新父文件夹内容
+      if (parentPath) {
+        await refreshFolderContents(parentPath);
+      }
+    } catch (error) {
+      console.error('重命名失败:', error);
+      alert('❌ Rename failed: ' + (error?.message || error));
+    }
+  };
+
+  // 在 Finder 中显示
+  const handleRevealInFinder = async (path) => {
+    try {
+      await revealItemInDir(path);
+    } catch (error) {
+      console.error('在 Finder 中显示失败:', error);
+    }
+  };
+
   // 删除文件或文件夹
   const handleDeleteFile = async (filePath, event = null) => {
     const fileName = filePath.split('/').pop();
@@ -2269,6 +2398,8 @@ function App() {
                           getSubfolderContents={getSubfolderContents}
                           onStartInlineCreate={startCreateEntryFromContext}
                           onDeleteEntry={handleDeleteFile}
+                          onRenameEntry={handleRenameEntry}
+                          onRevealInFinder={handleRevealInFinder}
                           inlineCreate={inlineCreate}
                           inlineInputRef={inlineCreateInputRef}
                           onInlineChange={handleInlineNameChange}
