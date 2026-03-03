@@ -26,18 +26,6 @@
     "fs:allow-rename",
     "fs:default",
     "fs:scope-home-recursive",
-    "shell:allow-open",
-    "shell:allow-execute",
-    {
-      "identifier": "shell:allow-execute",
-      "allow": [
-        {
-          "name": "git",
-          "cmd": "git",
-          "args": true
-        }
-      ]
-    },
     {
       "identifier": "fs:scope",
       "allow": [

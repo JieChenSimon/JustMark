@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "JustMark",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "identifier": "com.simonchen.justmark",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -82,19 +82,7 @@
             "fs:allow-read-file",
             "fs:allow-stat",
             "fs:allow-lstat",
-            "fs:allow-fstat",
-            "shell:allow-execute",
-            "shell:allow-open",
-            {
-              "identifier": "shell:allow-execute",
-              "allow": [
-                {
-                  "name": "git",
-                  "cmd": "git",
-                  "args": true
-                }
-              ]
-            }
+            "fs:allow-fstat"
           ]
         }
       ]
@@ -112,9 +100,6 @@
     ]
   },
   "plugins": {
-    "opener": {},
-    "shell": {
-      "open": true
-    }
+    "opener": {}
   }
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -11,447 +11,20 @@ import { writeTextFile, writeFile, readTextFile, readDir, remove, mkdir, rename 
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
-import { useGit } from './hooks/useGit';
 import { useWebClipper } from './hooks/useWebClipper';
-import { GitPanel } from './components/GitPanel';
+import { useTheme } from './hooks/useTheme';
+import { useSettings } from './hooks/useSettings';
+import { useWindowManager } from './hooks/useWindowManager';
+import { useAutoSave } from './hooks/useAutoSave';
+import { useRecentFiles } from './hooks/useRecentFiles';
 import PreviewColorPicker from './components/PreviewColorPicker';
 import EditorArea from './components/EditorArea';
 import ConfirmDialog from './components/ConfirmDialog';
 import { remarkObsidianImage } from './utils/remarkObsidianImage';
+import { FileTreeItem, InlineCreateRow } from './components/sidebar/FileTreeItem';
 
-// ==============================================
-// 🛠️ 核心配置
-// ==============================================
-const HEADER_HEIGHT = "h-8";
+import { HEADER_HEIGHT, FONT_FAMILIES, FONT_OPTIONS, BACKGROUND_COLORS } from './constants/theme';
 
-// 广受好评的字体配置（包含中文支持）
-const FONT_FAMILIES = [
-  {
-    name: 'System Default',
-    nameZh: '系统默认',
-    family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"',
-    description: 'Clean and modern'
-  },
-  {
-    name: 'Monospace',
-    nameZh: '等宽字体',
-    family: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-    description: 'Perfect for code'
-  },
-  {
-    name: 'Serif',
-    nameZh: '衬线字体',
-    family: 'Georgia, Cambria, "Times New Roman", Times, serif',
-    description: 'Classic and elegant'
-  },
-  {
-    name: 'PingFang SC',
-    nameZh: '苹方-简',
-    family: '"PingFang SC", -apple-system, BlinkMacSystemFont, sans-serif',
-    description: 'Apple Chinese (Simplified)'
-  },
-  {
-    name: 'PingFang TC',
-    nameZh: '苹方-繁',
-    family: '"PingFang TC", -apple-system, BlinkMacSystemFont, sans-serif',
-    description: 'Apple Chinese (Traditional)'
-  },
-  {
-    name: 'Hiragino Sans',
-    nameZh: '冬青黑体',
-    family: '"Hiragino Sans GB", "Hiragino Sans", "Microsoft YaHei", 微软雅黑, sans-serif',
-    description: 'Elegant Chinese/Japanese'
-  },
-  {
-    name: 'STSong',
-    nameZh: '华文宋体',
-    family: 'STSong, "Songti SC", SimSun, serif',
-    description: 'Traditional Chinese serif'
-  },
-  {
-    name: 'Noto Sans',
-    nameZh: 'Noto 黑体',
-    family: '"Noto Sans SC", "Noto Sans", sans-serif',
-    description: 'Google multilingual'
-  },
-  {
-    name: 'Source Han Sans',
-    nameZh: '思源黑体',
-    family: '"Source Han Sans SC", "Source Han Sans CN", sans-serif',
-    description: 'Adobe open source'
-  },
-];
-
-const FONT_OPTIONS = [
-  { label: 'Tiny', size: 'text-xs', leading: 'leading-5', name: 'Tiny' },
-  { label: 'Small', size: 'text-sm', leading: 'leading-6', name: 'Small' },
-  { label: 'Medium', size: 'text-base', leading: 'leading-7', name: 'Medium' },
-  { label: 'Large', size: 'text-lg', leading: 'leading-8', name: 'Large' },
-  { label: 'XLarge', size: 'text-xl', leading: 'leading-9', name: 'Extra Large' },
-];
-
-// 阅读背景色配置（仅用于预览区）
-const BACKGROUND_COLORS = [
-  {
-    name: 'Paper White',
-    bg: '#FFFFFF',
-    text: '#1D1D1F',
-    description: 'Pure & clean'
-  },
-  {
-    name: 'Light Gray',
-    bg: '#F5F5F7',
-    text: '#1D1D1F',
-    description: 'Default neutral'
-  },
-  {
-    name: 'Sepia',
-    bg: '#F4ECD8',
-    text: '#3D2817',
-    description: 'Warm & comfortable'
-  },
-  {
-    name: 'Green Tea',
-    bg: '#E3EDCD',
-    text: '#2C3A1E',
-    description: 'Eye protection'
-  },
-  {
-    name: 'Blue Light',
-    bg: '#E8F4F8',
-    text: '#1F3A47',
-    description: 'Calm & soothing'
-  },
-];
-
-function InlineCreateRow({
-  level,
-  type,
-  value,
-  inputRef,
-  onChange,
-  onConfirm,
-  onCancel
-}) {
-  const indent = level * 12;
-  return (
-    <div
-      className="w-full px-2 py-1 text-left text-[11px] flex items-center gap-1.5 transition-all group"
-      style={{ paddingLeft: `${indent + 8}px` }}
-    >
-      <span className="flex-shrink-0">{type === 'folder' ? '📁' : '📄'}</span>
-      <input
-        ref={inputRef}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            onConfirm();
-          } else if (e.key === 'Escape') {
-            e.preventDefault();
-            onCancel();
-          }
-        }}
-        className="flex-1 bg-transparent border-b border-gray-300 dark:border-gray-600 text-[11px] text-gray-800 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
-        placeholder={type === 'folder' ? 'New folder' : 'New file'}
-        autoComplete="off"
-        autoFocus
-      />
-    </div>
-  );
-}
-
-// 文件树组件
-function FileTreeItem({
-  entry,
-  basePath,
-  level,
-  currentFilePath,
-  expandedFolders,
-  folderRefreshTimestamps,
-  onToggleFolder,
-  onOpenFile,
-  getSubfolderContents,
-  onStartInlineCreate,
-  onDeleteEntry,
-  onSelectEntry,
-  onRenameEntry,
-  onRevealInFinder,
-  inlineCreate,
-  inlineInputRef,
-  onInlineChange,
-  onInlineConfirm,
-  onInlineCancel
-}) {
-  const [children, setChildren] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [contextMenu, setContextMenu] = useState(null);
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [renameValue, setRenameValue] = useState(entry.name);
-  const renameInputRef = useRef(null);
-  const fullPath = basePath + '/' + entry.name;
-  const isExpanded = expandedFolders.has(fullPath);
-  const isSelected = currentFilePath === fullPath;
-  const indent = level * 12;
-
-  useEffect(() => {
-    // 检查是否有刷新信号
-    const shouldLoad = entry.isDirectory && isExpanded && (children.length === 0 || (folderRefreshTimestamps && folderRefreshTimestamps[fullPath]));
-
-    if (shouldLoad) {
-      setIsLoading(true);
-      getSubfolderContents(fullPath).then(contents => {
-        setChildren(contents);
-        setIsLoading(false);
-      });
-    } else if (!isExpanded && children.length > 0) {
-      // 当折叠时清空子内容，这样下次展开时会重新加载
-      setChildren([]);
-    }
-  }, [isExpanded, folderRefreshTimestamps && folderRefreshTimestamps[fullPath]]);
-
-  const handleClick = () => {
-    console.log('点击文件/文件夹:', entry.name, '完整路径:', fullPath, '是否为目录:', entry.isDirectory);
-    if (onSelectEntry) {
-      onSelectEntry(fullPath, entry.isDirectory);
-    }
-    if (entry.isDirectory) {
-      onToggleFolder(fullPath);
-    } else {
-      console.log('调用 onOpenFile:', fullPath);
-      onOpenFile(fullPath);
-    }
-  };
-
-  const handleContextMenu = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (onSelectEntry) {
-      onSelectEntry(fullPath, entry.isDirectory);
-    }
-
-    // 获取鼠标位置
-    const x = e.clientX;
-    const y = e.clientY;
-
-    setContextMenu({
-      x,
-      y,
-      type: entry.isDirectory ? 'folder' : 'file',
-      path: fullPath
-    });
-  };
-
-  // 点击其他地方关闭菜单
-  useEffect(() => {
-    const handleClick = () => setContextMenu(null);
-    document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
-  }, []);
-
-  return (
-    <>
-      <button
-        onClick={handleClick}
-        onContextMenu={handleContextMenu}
-        className={`w-full px-2 py-1 text-left text-[11px] flex items-center gap-1.5 transition-all group ${isSelected
-          ? 'bg-blue-500/15 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300'
-          : 'hover:bg-gray-100/80 dark:hover:bg-gray-800/50 text-gray-700 dark:text-gray-300'
-          }`}
-        style={{ paddingLeft: `${indent + 8}px` }}
-      >
-        {entry.isDirectory && (
-          <svg
-            className={`w-3 h-3 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''} ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
-              }`}
-            fill="currentColor"
-            viewBox="0 0 20 20"
-          >
-            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-          </svg>
-        )}
-        {!entry.isDirectory && <span className="w-3" />}
-        <span className={`flex-shrink-0 ${isSelected ? 'opacity-100' : 'opacity-70'}`}>
-          {entry.isDirectory ? '📁' : '📄'}
-        </span>
-        {isRenaming ? (
-          <input
-            ref={renameInputRef}
-            value={renameValue}
-            onChange={(e) => setRenameValue(e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                const trimmed = renameValue.trim();
-                if (trimmed && trimmed !== entry.name) {
-                  onRenameEntry(fullPath, trimmed);
-                }
-                setIsRenaming(false);
-              } else if (e.key === 'Escape') {
-                e.preventDefault();
-                setRenameValue(entry.name);
-                setIsRenaming(false);
-              }
-            }}
-            onBlur={() => {
-              const trimmed = renameValue.trim();
-              if (trimmed && trimmed !== entry.name) {
-                onRenameEntry(fullPath, trimmed);
-              }
-              setIsRenaming(false);
-            }}
-            className="flex-1 bg-transparent border-b border-blue-500 dark:border-blue-400 text-[11px] text-gray-800 dark:text-gray-100 outline-none"
-            autoComplete="off"
-          />
-        ) : (
-          <span className={`truncate ${isSelected ? 'font-medium' : 'font-normal'}`}>
-            {entry.name}
-          </span>
-        )}
-      </button>
-
-      {/* macOS 风格的右键菜单 - 更紧凑 */}
-      {contextMenu && contextMenu.path === fullPath && (
-        <div
-          className="fixed z-50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 rounded-lg shadow-lg overflow-hidden animate-scale-in origin-top-left"
-          style={{
-            top: `${Math.min(contextMenu.y, window.innerHeight - 100)}px`,
-            left: `${contextMenu.x}px`,
-            width: '140px'
-          }}
-        >
-          {contextMenu.type === 'folder' && (
-            <>
-              <button
-                onClick={() => {
-                  onStartInlineCreate(fullPath, 'file');
-                  setContextMenu(null);
-                }}
-                className="w-full px-2 py-1 text-left text-[10px] font-medium text-gray-700 dark:text-gray-200 hover:bg-blue-500 hover:text-white dark:hover:bg-blue-600 transition-colors flex items-center gap-2"
-              >
-                <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                <span>New File</span>
-              </button>
-              <button
-                onClick={() => {
-                  onStartInlineCreate(fullPath, 'folder');
-                  setContextMenu(null);
-                }}
-                className="w-full px-2 py-1 text-left text-[10px] font-medium text-gray-700 dark:text-gray-200 hover:bg-blue-500 hover:text-white dark:hover:bg-blue-600 transition-colors flex items-center gap-2"
-              >
-                <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7a2 2 0 012-2h3l2 2h9a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V7z" />
-                </svg>
-                <span>New Folder</span>
-              </button>
-              <div className="h-px bg-gray-200/50 dark:bg-gray-700/50 my-0.5 mx-1" />
-            </>
-          )}
-          <button
-            onClick={() => {
-              setRenameValue(entry.name);
-              setIsRenaming(true);
-              setContextMenu(null);
-              setTimeout(() => {
-                if (renameInputRef.current) {
-                  renameInputRef.current.focus();
-                  const dotIndex = entry.name.lastIndexOf('.');
-                  if (!entry.isDirectory && dotIndex > 0) {
-                    renameInputRef.current.setSelectionRange(0, dotIndex);
-                  } else {
-                    renameInputRef.current.select();
-                  }
-                }
-              }, 50);
-            }}
-            className="w-full px-2 py-1 text-left text-[10px] font-medium text-gray-700 dark:text-gray-200 hover:bg-blue-500 hover:text-white dark:hover:bg-blue-600 transition-colors flex items-center gap-2"
-          >
-            <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            <span>Rename</span>
-          </button>
-          <button
-            onClick={() => {
-              onRevealInFinder(fullPath);
-              setContextMenu(null);
-            }}
-            className="w-full px-2 py-1 text-left text-[10px] font-medium text-gray-700 dark:text-gray-200 hover:bg-blue-500 hover:text-white dark:hover:bg-blue-600 transition-colors flex items-center gap-2"
-          >
-            <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-            <span>Reveal in Finder</span>
-          </button>
-          <div className="h-px bg-gray-200/50 dark:bg-gray-700/50 my-0.5 mx-1" />
-          <button
-            onClick={(e) => {
-              onDeleteEntry(fullPath, e);
-              setContextMenu(null);
-            }}
-            className="w-full px-2 py-1 text-left text-[10px] font-medium text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white dark:hover:bg-red-600 transition-colors flex items-center gap-2"
-          >
-            <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3H4v2h16V7h-3z" />
-            </svg>
-            <span>Delete</span>
-          </button>
-        </div>
-      )}
-
-      {entry.isDirectory && isExpanded && (
-        <div>
-          {isLoading ? (
-            <div className="px-2 py-1 text-[10px] text-gray-400 dark:text-gray-500" style={{ paddingLeft: `${indent + 24}px` }}>
-              Loading...
-            </div>
-          ) : (
-            children.map((child, index) => (
-              <FileTreeItem
-                key={index}
-                entry={child}
-                basePath={fullPath}
-                level={level + 1}
-                currentFilePath={currentFilePath}
-                expandedFolders={expandedFolders}
-                folderRefreshTimestamps={folderRefreshTimestamps}
-                onToggleFolder={onToggleFolder}
-                onOpenFile={onOpenFile}
-                getSubfolderContents={getSubfolderContents}
-                onStartInlineCreate={onStartInlineCreate}
-                onDeleteEntry={onDeleteEntry}
-                onRenameEntry={onRenameEntry}
-                onRevealInFinder={onRevealInFinder}
-                inlineCreate={inlineCreate}
-                inlineInputRef={inlineInputRef}
-                onInlineChange={onInlineChange}
-                onInlineConfirm={onInlineConfirm}
-                onInlineCancel={onInlineCancel}
-                onSelectEntry={onSelectEntry}
-              />
-            ))
-          )}
-          {inlineCreate && inlineCreate.parentPath === fullPath && (
-            <InlineCreateRow
-              level={level + 1}
-              type={inlineCreate.type}
-              value={inlineCreate.value}
-              inputRef={inlineInputRef}
-              onChange={onInlineChange}
-              onConfirm={onInlineConfirm}
-              onCancel={onInlineCancel}
-            />
-          )}
-        </div>
-      )}
-    </>
-  );
-}
 
 // 从 localStorage 加载保存的状态
 const loadSavedState = (key, defaultValue) => {
@@ -495,37 +68,63 @@ function App() {
   }, []);
 
   const [markdown, setMarkdown] = useState("### JustMark\n Write in a single way...");
-  const [isDarkMode, setIsDarkMode] = useState(() => loadSavedState('isDarkMode', false));
-  const [fontIndex, setFontIndex] = useState(() => loadSavedState('fontIndex', 1)); // Default to Small (index 1)
-  const [fontFamilyIndex, setFontFamilyIndex] = useState(() => loadSavedState('fontFamilyIndex', 1));
-  const [bgColorIndex, setBgColorIndex] = useState(() => loadSavedState('bgColorIndex', 0));
-  const [previewBgColorIndex, setPreviewBgColorIndex] = useState(() => loadSavedState('previewBgColorIndex', null)); // null 表示使用主题颜色
-  const [showPreviewBgColorMenu, setShowPreviewBgColorMenu] = useState(false);
+
+  // === 主题管理 ===
+  const theme = useTheme();
+  const {
+    isDarkMode, setIsDarkMode,
+    fontIndex, setFontIndex,
+    fontFamilyIndex, setFontFamilyIndex,
+    bgColorIndex, setBgColorIndex,
+    previewBgColorIndex, setPreviewBgColorIndex,
+    showFontMenu, setShowFontMenu,
+    showBgColorMenu, setShowBgColorMenu,
+    showPreviewBgColorMenu, setShowPreviewBgColorMenu,
+    showBgColorWarning, setShowBgColorWarning,
+    currentFont, currentFontFamily, currentBgColor,
+    appBgColor, appTextColor,
+    previewBgColor, previewTextColor,
+    toggleTheme,
+    increaseFontSize, decreaseFontSize,
+  } = theme;
+
+  // === 设置管理 ===
+  const { 
+    attachmentFolder, setAttachmentFolder, 
+    showSettingsDialog, setShowSettingsDialog,
+    autoSaveEnabled, setAutoSaveEnabled,
+    fileSortBy, setFileSortBy
+  } = useSettings();
+
+  // === 最近文件管理 ===
+  const { recentFiles, addRecentFile, clearRecentFiles } = useRecentFiles();
+
+  // === 窗口面板管理 ===
+  const {
+    sidebarWidth, setSidebarWidth,
+    editorWidth, setEditorWidth,
+    isDraggingSidebar, setIsDraggingSidebar,
+    isDraggingEditor, setIsDraggingEditor,
+  } = useWindowManager();
+
   const [isExporting, setIsExporting] = useState(false);
   const [currentFilePath, setCurrentFilePath] = useState(() => loadSavedState('currentFilePath', null));
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [showFontMenu, setShowFontMenu] = useState(false);
-  const [showBgColorMenu, setShowBgColorMenu] = useState(false);
   const [showOpenMenu, setShowOpenMenu] = useState(false);
   const [previewMode, setPreviewMode] = useState(() => loadSavedState('previewMode', 'markdown'));
   const [showIndicator, setShowIndicator] = useState(true);
-  const [showBgColorWarning, setShowBgColorWarning] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(() => loadSavedState('sidebarVisible', false));
-  const [sidebarView, setSidebarView] = useState(() => loadSavedState('sidebarView', 'files'));
   const [currentFolder, setCurrentFolder] = useState(() => loadSavedState('currentFolder', null));
   const [folderContents, setFolderContents] = useState([]);
   const [expandedFolders, setExpandedFolders] = useState(() => {
     const saved = loadSavedState('expandedFolders', []);
     return new Set(saved);
   });
-  // 文件夹刷新时间戳，用于强制刷新子组件
   const [folderRefreshTimestamps, setFolderRefreshTimestamps] = useState({});
   const indicatorTimeoutRef = useRef(null);
   const warningTimeoutRef = useRef(null);
 
-  // Git 集成
-  const git = useGit(currentFolder);
-  const [gitPanelVisible, setGitPanelVisible] = useState(false);
+
   const [pdfScale, setPdfScale] = useState(1);
   const pdfContainerRef = useRef(null);
   const previewSectionRef = useRef(null);
@@ -561,110 +160,34 @@ function App() {
 
   // 处理预览区点击跳转到编辑器
   const handlePreviewClickToJump = (e) => {
-    // 只在 Markdown 模式下处理
     if (previewMode !== 'markdown' || !previewSectionRef.current || !editorAreaRef.current) {
       return;
     }
-
-    // 计算点击位置在预览区的相对位置
     const preview = previewSectionRef.current;
     const scrollPercentage = preview.scrollTop / (preview.scrollHeight - preview.clientHeight);
-
-    // 让编辑器滚动到对应位置
     if (editorAreaRef.current.scrollToPercentage) {
       editorAreaRef.current.scrollToPercentage(scrollPercentage);
     }
   };
 
-  // 可调整面板宽度
-  const [sidebarWidth, setSidebarWidth] = useState(() => loadSavedState('sidebarWidth', 224));
-  const [editorWidth, setEditorWidth] = useState(() => loadSavedState('editorWidth', 50));
-  const [isDraggingSidebar, setIsDraggingSidebar] = useState(false);
-  const [isDraggingEditor, setIsDraggingEditor] = useState(false);
-
   // 目录上下文 & 内联新建
-  const [selectedSidebarEntry, setSelectedSidebarEntry] = useState(null); // { path: string, isDirectory: boolean }
+  const [selectedSidebarEntry, setSelectedSidebarEntry] = useState(null);
   const [showNewMenu, setShowNewMenu] = useState(false);
   const newMenuRef = useRef(null);
-  const [inlineCreate, setInlineCreate] = useState(null); // { parentPath: string, type: 'file'|'folder', value: string }
+  const [inlineCreate, setInlineCreate] = useState(null);
   const inlineCreateInputRef = useRef(null);
 
-  // Obsidian 兼容性：attachment 文件夹配置
-  const [attachmentFolder, setAttachmentFolder] = useState(() => loadSavedState('attachmentFolder', '00- Attachment'));
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  // 保存状态到 localStorage（主题/设置/窗口管理已在 hooks 中处理）
+  useEffect(() => { saveState('currentFilePath', currentFilePath); }, [currentFilePath]);
+  useEffect(() => { saveState('previewMode', previewMode); }, [previewMode]);
+  useEffect(() => { saveState('previewVisible', previewVisible); }, [previewVisible]);
+  useEffect(() => { saveState('sidebarVisible', sidebarVisible); }, [sidebarVisible]);
 
-  // 保存状态到 localStorage
-  useEffect(() => {
-    saveState('isDarkMode', isDarkMode);
-  }, [isDarkMode]);
+  useEffect(() => { saveState('currentFolder', currentFolder); }, [currentFolder]);
+  useEffect(() => { saveState('expandedFolders', Array.from(expandedFolders)); }, [expandedFolders]);
 
-  useEffect(() => {
-    saveState('fontIndex', fontIndex);
-  }, [fontIndex]);
-
-  useEffect(() => {
-    saveState('fontFamilyIndex', fontFamilyIndex);
-  }, [fontFamilyIndex]);
-
-  useEffect(() => {
-    saveState('bgColorIndex', bgColorIndex);
-    // 切换主题时，重置预览区颜色为主题颜色
-    setPreviewBgColorIndex(null);
-  }, [bgColorIndex]);
-
-  useEffect(() => {
-    saveState('previewBgColorIndex', previewBgColorIndex);
-  }, [previewBgColorIndex]);
-
-  useEffect(() => {
-    saveState('currentFilePath', currentFilePath);
-  }, [currentFilePath]);
-
-  useEffect(() => {
-    saveState('previewMode', previewMode);
-  }, [previewMode]);
-
-  useEffect(() => {
-    saveState('previewVisible', previewVisible);
-  }, [previewVisible]);
-
-  useEffect(() => {
-    saveState('sidebarVisible', sidebarVisible);
-  }, [sidebarVisible]);
-
-  useEffect(() => {
-    saveState('sidebarView', sidebarView);
-  }, [sidebarView]);
-
-  useEffect(() => {
-    saveState('currentFolder', currentFolder);
-  }, [currentFolder]);
-
-  useEffect(() => {
-    saveState('expandedFolders', Array.from(expandedFolders));
-  }, [expandedFolders]);
-
-  useEffect(() => {
-    saveState('sidebarWidth', sidebarWidth);
-  }, [sidebarWidth]);
-
-  useEffect(() => {
-    saveState('editorWidth', editorWidth);
-  }, [editorWidth]);
-
-  useEffect(() => {
-    saveState('attachmentFolder', attachmentFolder);
-  }, [attachmentFolder]);
-
-  // 定义 loadFolderContents 函数需要在这里之前声明，所以我们移除这个 useEffect
+  // 定义 loadFolderContents 函数需要在这里之前声明
   // 恢复逻辑将在 loadFolderContents 定义之后添加
-
-  const toggleTheme = () => {
-    // 使用 requestAnimationFrame 优化主题切换性能
-    requestAnimationFrame(() => {
-      setIsDarkMode(!isDarkMode);
-    });
-  };
 
   // PDF 自动缩放以适应窗口和拖动
   useEffect(() => {
@@ -699,120 +222,7 @@ function App() {
     };
   }, [previewMode]);
 
-  // 处理侧边栏拖动
-  useEffect(() => {
-    if (!isDraggingSidebar) return;
 
-    // 防止拖动时选中文本和闪动
-    document.body.classList.add('dragging');
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'col-resize';
-
-    let animationFrameId = null;
-
-    const handleMouseMove = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      // 使用 requestAnimationFrame 优化性能
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-
-      animationFrameId = requestAnimationFrame(() => {
-        const newWidth = e.clientX;
-        if (newWidth >= 150 && newWidth <= 400) {
-          setSidebarWidth(newWidth);
-        }
-      });
-    };
-
-    const handleMouseUp = () => {
-      setIsDraggingSidebar(false);
-      document.body.classList.remove('dragging');
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
-
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-    };
-
-    document.addEventListener('mousemove', handleMouseMove, { passive: false });
-    document.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.classList.remove('dragging');
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
-
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-    };
-  }, [isDraggingSidebar]);
-
-  // 处理编辑器/预览区拖动
-  useEffect(() => {
-    if (!isDraggingEditor) return;
-
-    // 防止拖动时选中文本和闪动
-    document.body.classList.add('dragging');
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'col-resize';
-
-    let animationFrameId = null;
-
-    const handleMouseMove = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      // 使用 requestAnimationFrame 优化性能
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-
-      animationFrameId = requestAnimationFrame(() => {
-        const container = document.querySelector('main');
-        if (!container) return;
-
-        const rect = container.getBoundingClientRect();
-        const newPercent = ((e.clientX - rect.left) / rect.width) * 100;
-
-        if (newPercent >= 20 && newPercent <= 80) {
-          setEditorWidth(newPercent);
-        }
-      });
-    };
-
-    const handleMouseUp = () => {
-      setIsDraggingEditor(false);
-      document.body.classList.remove('dragging');
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
-
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-    };
-
-    document.addEventListener('mousemove', handleMouseMove, { passive: false });
-    document.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.classList.remove('dragging');
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
-
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-    };
-  }, [isDraggingEditor]);
 
   // 显示指示器并设置自动隐藏
   const showPreviewIndicator = () => {
@@ -1086,9 +496,9 @@ function App() {
     }
   };
 
-  const handleSelectSidebarEntry = (path, isDirectory) => {
+  const handleSelectSidebarEntry = useCallback((path, isDirectory) => {
     setSelectedSidebarEntry({ path, isDirectory });
-  };
+  }, []);
 
   const resolveCreationTargetPath = (explicitBasePath) => {
     if (explicitBasePath) return explicitBasePath;
@@ -1126,9 +536,9 @@ function App() {
     setShowNewMenu(false);
   };
 
-  const startCreateEntryFromContext = (folderPath, type = 'file') => {
+  const startCreateEntryFromContext = useCallback((folderPath, type = 'file') => {
     startInlineCreate(type, folderPath);
-  };
+  }, [startInlineCreate]);
 
   const cancelInlineCreate = () => {
     setInlineCreate(null);
@@ -1193,33 +603,7 @@ function App() {
   };
 
   const deleteEntryWithFallback = async (targetPath) => {
-    try {
-      await remove(targetPath, { recursive: true });
-    } catch (error) {
-      console.warn('remove API 删除失败，尝试使用 shell:', error);
-      try {
-        const { Command } = await import('@tauri-apps/plugin-shell');
-        const isWindows = navigator.userAgent.toUpperCase().includes('WINDOWS');
-
-        if (isWindows) {
-          const quotedPath = `"${targetPath}"`;
-          const cmd = new Command('cmd', ['/C', 'rd', '/s', '/q', quotedPath]);
-          const result = await cmd.execute();
-          if (result.code !== 0) {
-            throw new Error(result.stderr || 'cmd 删除失败');
-          }
-        } else {
-          const cmd = new Command('rm', ['-rf', targetPath]);
-          const result = await cmd.execute();
-          if (result.code !== 0) {
-            throw new Error(result.stderr || 'rm 删除失败');
-          }
-        }
-      } catch (shellError) {
-        console.error('shell 删除同时失败:', shellError);
-        throw error ?? shellError;
-      }
-    }
+    await remove(targetPath, { recursive: true });
   };
 
   // 新建空白文档或在目录中创建条目
@@ -1298,7 +682,7 @@ function App() {
   };
 
   // 切换文件夹展开/折叠
-  const toggleFolder = async (folderPath) => {
+  const toggleFolder = useCallback(async (folderPath) => {
     setExpandedFolders(prev => {
       const newSet = new Set(prev);
       if (newSet.has(folderPath)) {
@@ -1308,49 +692,45 @@ function App() {
       }
       return newSet;
     });
-  };
+  }, []);
 
   // 加载文件夹内容（根目录）
-  const loadFolderContents = async (folderPath) => {
+  const sortEntries = useCallback((entries) => {
+    return [...entries].sort((a, b) => {
+      if (a.isDirectory && !b.isDirectory) return -1;
+      if (!a.isDirectory && b.isDirectory) return 1;
+      
+      if (fileSortBy === 'modified') {
+        return (b.modifiedAt || 0) - (a.modifiedAt || 0);
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }, [fileSortBy]);
+
+  const loadFolderContents = useCallback(async (folderPath) => {
     try {
       setCurrentFolder(folderPath);
       const entries = await readDir(folderPath);
-
-      // Show all files and folders (remove .md filter to show images too)
-      const filtered = entries
-        .sort((a, b) => {
-          // 文件夹在前，文件在后
-          if (a.isDirectory && !b.isDirectory) return -1;
-          if (!a.isDirectory && b.isDirectory) return 1;
-          return a.name.localeCompare(b.name);
-        });
-
-      setFolderContents(filtered);
-      // 默认展开根目录
+      setFolderContents(sortEntries(entries));
       setExpandedFolders(new Set([folderPath]));
     } catch (error) {
       console.error('读取文件夹失败:', error);
     }
-  };
+  }, [sortEntries]);
 
   // 递归读取子文件夹内容
-  const getSubfolderContents = async (folderPath) => {
+  const getSubfolderContents = useCallback(async (folderPath) => {
     try {
       const entries = await readDir(folderPath);
-      return entries
-        .sort((a, b) => {
-          if (a.isDirectory && !b.isDirectory) return -1;
-          if (!a.isDirectory && b.isDirectory) return 1;
-          return a.name.localeCompare(b.name);
-        });
+      return sortEntries(entries);
     } catch (error) {
       console.error('读取子文件夹失败:', error);
       return [];
     }
-  };
+  }, [sortEntries]);
 
   // 从侧边栏打开文件
-  const handleOpenFileFromSidebar = async (filePath) => {
+  const handleOpenFileFromSidebar = useCallback(async (filePath) => {
     console.log('尝试打开文件:', filePath);
     try {
       const content = await readTextFile(filePath);
@@ -1359,22 +739,19 @@ function App() {
       setCurrentFilePath(filePath);
       setHasUnsavedChanges(false);
       setSelectedSidebarEntry({ path: filePath, isDirectory: false });
+      addRecentFile(filePath);
     } catch (error) {
       console.error('打开文件失败:', error);
       alert('❌ 打开文件失败: ' + error.message);
     }
-  };
+  }, [addRecentFile]);
 
   // 刷新文件夹内容
   const refreshFolderContents = async (folderPath) => {
     try {
       const entries = await readDir(folderPath);
-      const filtered = entries
-        .filter(entry => {
-          if (entry.isDirectory) return true;
-          const name = entry.name.toLowerCase();
-          return name.endsWith('.md') || name.endsWith('.markdown') || name.endsWith('.txt');
-        })
+      // 与 loadFolderContents 保持一致：显示所有文件和文件夹
+      const sorted = entries
         .sort((a, b) => {
           if (a.isDirectory && !b.isDirectory) return -1;
           if (!a.isDirectory && b.isDirectory) return 1;
@@ -1383,7 +760,7 @@ function App() {
 
       // 如果是根目录，更新根目录内容
       if (currentFolder === folderPath) {
-        setFolderContents(filtered);
+        setFolderContents(sorted);
       }
 
       // 更新刷新时间戳，通知子组件刷新
@@ -1397,7 +774,7 @@ function App() {
   };
 
   // 重命名文件或文件夹
-  const handleRenameEntry = async (oldPath, newName) => {
+  const handleRenameEntry = useCallback(async (oldPath, newName) => {
     try {
       const lastSlashIndex = oldPath.lastIndexOf('/');
       const parentPath = lastSlashIndex > 0 ? oldPath.substring(0, lastSlashIndex) : currentFolder;
@@ -1436,16 +813,16 @@ function App() {
       console.error('重命名失败:', error);
       alert('❌ Rename failed: ' + (error?.message || error));
     }
-  };
+  }, [currentFolder, currentFilePath, refreshFolderContents]);
 
   // 在 Finder 中显示
-  const handleRevealInFinder = async (path) => {
+  const handleRevealInFinder = useCallback(async (path) => {
     try {
       await revealItemInDir(path);
     } catch (error) {
       console.error('在 Finder 中显示失败:', error);
     }
-  };
+  }, []);
 
   // 删除文件或文件夹
   const handleDeleteFile = async (filePath, event = null) => {
@@ -1505,7 +882,7 @@ function App() {
   };
 
   // 保存文件
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     try {
       let filePath = currentFilePath;
 
@@ -1527,11 +904,12 @@ function App() {
       // 直接保存到当前文件
       await writeTextFile(filePath, markdown);
       setHasUnsavedChanges(false);
+      addRecentFile(filePath);
     } catch (error) {
       console.error('保存文件失败:', error);
       alert('❌ 保存失败: ' + error.message);
     }
-  };
+  }, [currentFilePath, markdown, addRecentFile]);
 
   // 另存为
   const handleSaveAs = async () => {
@@ -1549,12 +927,16 @@ function App() {
       await writeTextFile(filePath, markdown);
       setCurrentFilePath(filePath);
       setHasUnsavedChanges(false);
+      addRecentFile(filePath);
       alert('✅ 文件保存成功！');
     } catch (error) {
       console.error('保存文件失败:', error);
       alert('❌ 保存失败: ' + error.message);
     }
   };
+
+  // 自动保存
+  useAutoSave(markdown, currentFilePath, hasUnsavedChanges, autoSaveEnabled, handleSave);
 
   // 监听内容变化
   const handleMarkdownChange = (e) => {
@@ -1582,16 +964,6 @@ function App() {
       const newCursorPos = start + imageMarkdown.length;
       textareaElement.setSelectionRange(newCursorPos, newCursorPos);
     }, 0);
-  };
-
-  // 字体变大
-  const increaseFontSize = () => {
-    setFontIndex((prev) => Math.min(prev + 1, FONT_OPTIONS.length - 1));
-  };
-
-  // 字体变小
-  const decreaseFontSize = () => {
-    setFontIndex((prev) => Math.max(prev - 1, 0));
   };
 
   // 使用 html2canvas + jsPDF 导出 PDF
@@ -1693,20 +1065,6 @@ function App() {
     }
   };
 
-  const currentFont = FONT_OPTIONS[fontIndex];
-  const currentFontFamily = FONT_FAMILIES[fontFamilyIndex];
-  const currentBgColor = BACKGROUND_COLORS[bgColorIndex];
-
-  // 应用颜色逻辑：
-  // 1. 黑暗模式优先：如果开启黑暗模式，使用纯黑背景
-  // 2. 否则使用主题颜色（浅色版本）
-  const appBgColor = isDarkMode ? '#1A1A1A' : currentBgColor.bg;
-  const appTextColor = isDarkMode ? '#E5E7EB' : currentBgColor.text;
-
-  // 预览区颜色：如果设置了独立的预览区颜色，使用独立颜色；否则使用应用颜色
-  const previewColor = previewBgColorIndex !== null ? BACKGROUND_COLORS[previewBgColorIndex] : null;
-  const previewBgColor = previewColor ? previewColor.bg : appBgColor;
-  const previewTextColor = previewColor ? previewColor.text : appTextColor;
 
   // 使用 useMemo 缓存 markdown 渲染内容，避免主题切换时重新渲染
   const renderedMarkdown = useMemo(() => {
@@ -2342,90 +1700,71 @@ function App() {
                   borderRightColor: 'rgba(0, 0, 0, 0.1)'
                 }}
               >
-                {sidebarView === 'files' ? (
-                  <>
-                    {/* 文件浏览器头部 */}
-                    <div
-                      className="h-10 px-3 flex items-center justify-between border-b flex-shrink-0"
-                      style={{
-                        borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-                        backgroundColor: appBgColor
-                      }}
+                {/* 文件浏览器头部 */}
+                <div
+                  className="h-10 px-3 flex items-center justify-between border-b flex-shrink-0"
+                  style={{
+                    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+                    backgroundColor: appBgColor
+                  }}
+                >
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span
+                      className="text-[11px] font-semibold truncate"
+                      style={{ color: appTextColor }}
                     >
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <span
-                          className="text-[11px] font-semibold truncate"
-                          style={{ color: appTextColor }}
-                        >
-                          {currentFolder.split('/').pop() || 'Files'}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => setSidebarVisible(false)}
-                        className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200/70 dark:hover:bg-gray-700/70 transition-all active:scale-95"
-                        title="Close"
-                      >
-                        <svg className="w-3 h-3 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
+                      {currentFolder.split('/').pop() || 'Files'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setSidebarVisible(false)}
+                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200/70 dark:hover:bg-gray-700/70 transition-all active:scale-95"
+                    title="Close"
+                  >
+                    <svg className="w-3 h-3 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
 
-                    {/* 文件树列表 */}
-                    <div className="flex-1 overflow-y-auto overflow-x-hidden py-1 custom-scrollbar">
-                      {inlineCreate && inlineCreate.parentPath === currentFolder && (
-                        <InlineCreateRow
-                          level={0}
-                          type={inlineCreate.type}
-                          value={inlineCreate.value}
-                          inputRef={inlineCreateInputRef}
-                          onChange={handleInlineNameChange}
-                          onConfirm={confirmInlineCreate}
-                          onCancel={cancelInlineCreate}
-                        />
-                      )}
-                      {folderContents.map((entry, index) => (
-                        <FileTreeItem
-                          key={index}
-                          entry={entry}
-                          basePath={currentFolder}
-                          level={0}
-                          currentFilePath={currentFilePath}
-                          expandedFolders={expandedFolders}
-                          folderRefreshTimestamps={folderRefreshTimestamps}
-                          onToggleFolder={toggleFolder}
-                          onOpenFile={handleOpenFileFromSidebar}
-                          getSubfolderContents={getSubfolderContents}
-                          onStartInlineCreate={startCreateEntryFromContext}
-                          onDeleteEntry={handleDeleteFile}
-                          onRenameEntry={handleRenameEntry}
-                          onRevealInFinder={handleRevealInFinder}
-                          inlineCreate={inlineCreate}
-                          inlineInputRef={inlineCreateInputRef}
-                          onInlineChange={handleInlineNameChange}
-                          onInlineConfirm={confirmInlineCreate}
-                          onInlineCancel={cancelInlineCreate}
-                          onSelectEntry={handleSelectSidebarEntry}
-                        />
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  /* Git 源代码管理面板 */
-                  <GitPanel
-                    gitStatus={git.status}
-                    onStageFile={git.stageFile}
-                    onUnstageFile={git.unstageFile}
-                    onStageAll={git.stageAll}
-                    onUnstageAll={git.unstageAll}
-                    onCommit={git.commit}
-                    onDiscardChanges={git.discardChanges}
-                    onGetLog={git.getLog}
-                    onClose={() => setSidebarVisible(false)}
-                    appBgColor={appBgColor}
-                    appTextColor={appTextColor}
-                  />
-                )}
+                {/* 文件树列表 */}
+                <div className="flex-1 overflow-y-auto overflow-x-hidden py-1 custom-scrollbar">
+                  {inlineCreate && inlineCreate.parentPath === currentFolder && (
+                    <InlineCreateRow
+                      level={0}
+                      type={inlineCreate.type}
+                      value={inlineCreate.value}
+                      inputRef={inlineCreateInputRef}
+                      onChange={handleInlineNameChange}
+                      onConfirm={confirmInlineCreate}
+                      onCancel={cancelInlineCreate}
+                    />
+                  )}
+                  {folderContents.map((entry, index) => (
+                    <FileTreeItem
+                      key={index}
+                      entry={entry}
+                      basePath={currentFolder}
+                      level={0}
+                      currentFilePath={currentFilePath}
+                      expandedFolders={expandedFolders}
+                      folderRefreshTimestamps={folderRefreshTimestamps}
+                      onToggleFolder={toggleFolder}
+                      onOpenFile={handleOpenFileFromSidebar}
+                      getSubfolderContents={getSubfolderContents}
+                      onStartInlineCreate={startCreateEntryFromContext}
+                      onDeleteEntry={handleDeleteFile}
+                      onRenameEntry={handleRenameEntry}
+                      onRevealInFinder={handleRevealInFinder}
+                      inlineCreate={inlineCreate}
+                      inlineInputRef={inlineCreateInputRef}
+                      onInlineChange={handleInlineNameChange}
+                      onInlineConfirm={confirmInlineCreate}
+                      onInlineCancel={cancelInlineCreate}
+                      onSelectEntry={handleSelectSidebarEntry}
+                    />
+                  ))}
+                </div>
               </div>
 
               {/* 侧边栏拖动条 */}
@@ -2449,10 +1788,7 @@ function App() {
             currentFolder={currentFolder}
             currentFilePath={currentFilePath}
             sidebarVisible={sidebarVisible}
-            sidebarView={sidebarView}
             onToggleSidebar={setSidebarVisible}
-            onSetSidebarView={setSidebarView}
-            gitStatus={git.status}
             onEditorScroll={handleEditorScroll}
             previewVisible={previewVisible}
             onTogglePreview={togglePreviewVisibility}

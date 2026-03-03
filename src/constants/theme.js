@@ -1,18 +1,78 @@
+// ==============================================
+// 🛠️ 核心配置常量
+// ==============================================
+
+// 头部高度
+export const HEADER_HEIGHT = 'h-8';
+
+// 广受好评的字体配置（包含中文支持）
+export const FONT_FAMILIES = [
+  {
+    name: 'System Default',
+    nameZh: '系统默认',
+    family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"',
+    description: 'Clean and modern'
+  },
+  {
+    name: 'Monospace',
+    nameZh: '等宽字体',
+    family: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+    description: 'Perfect for code'
+  },
+  {
+    name: 'Serif',
+    nameZh: '衬线字体',
+    family: 'Georgia, Cambria, "Times New Roman", Times, serif',
+    description: 'Classic and elegant'
+  },
+  {
+    name: 'PingFang SC',
+    nameZh: '苹方-简',
+    family: '"PingFang SC", -apple-system, BlinkMacSystemFont, sans-serif',
+    description: 'Apple Chinese (Simplified)'
+  },
+  {
+    name: 'PingFang TC',
+    nameZh: '苹方-繁',
+    family: '"PingFang TC", -apple-system, BlinkMacSystemFont, sans-serif',
+    description: 'Apple Chinese (Traditional)'
+  },
+  {
+    name: 'Hiragino Sans',
+    nameZh: '冬青黑体',
+    family: '"Hiragino Sans GB", "Hiragino Sans", "Microsoft YaHei", 微软雅黑, sans-serif',
+    description: 'Elegant Chinese/Japanese'
+  },
+  {
+    name: 'STSong',
+    nameZh: '华文宋体',
+    family: 'STSong, "Songti SC", SimSun, serif',
+    description: 'Traditional Chinese serif'
+  },
+  {
+    name: 'Noto Sans',
+    nameZh: 'Noto 黑体',
+    family: '"Noto Sans SC", "Noto Sans", sans-serif',
+    description: 'Google multilingual'
+  },
+  {
+    name: 'Source Han Sans',
+    nameZh: '思源黑体',
+    family: '"Source Han Sans SC", "Source Han Sans CN", sans-serif',
+    description: 'Adobe open source'
+  },
+];
+
 // 字体大小选项
 export const FONT_OPTIONS = [
-  { label: 'Small',  size: 'text-sm',   leading: 'leading-6', name: '小号' },
-  { label: 'Medium', size: 'text-base', leading: 'leading-7', name: '中号' },
-  { label: 'Large',  size: 'text-lg',   leading: 'leading-8', name: '大号' },
+  { label: 'Tiny', size: 'text-xs', leading: 'leading-5', name: 'Tiny' },
+  { label: 'Small', size: 'text-sm', leading: 'leading-6', name: 'Small' },
+  { label: 'Medium', size: 'text-base', leading: 'leading-7', name: 'Medium' },
+  { label: 'Large', size: 'text-lg', leading: 'leading-8', name: 'Large' },
+  { label: 'XLarge', size: 'text-xl', leading: 'leading-9', name: 'Extra Large' },
 ];
 
-// 字体家族选项
-export const FONT_FAMILIES = [
-  { name: 'System',  family: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', nameZh: '系统' },
-  { name: 'Serif',   family: 'Georgia, "Times New Roman", serif',                          nameZh: '衬线' },
-  { name: 'Mono',    family: '"Courier New", Courier, monospace',                          nameZh: '等宽' },
-];
-
-// 主题颜色配置（应用到整个应用）
+// 阅读背景色配置
 export const BACKGROUND_COLORS = [
   {
     name: 'Paper White',
@@ -45,6 +105,3 @@ export const BACKGROUND_COLORS = [
     description: 'Calm & soothing'
   },
 ];
-
-// 头部高度
-export const HEADER_HEIGHT = 'h-10';

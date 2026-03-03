@@ -15,10 +15,7 @@ const EditorArea = forwardRef(({
   currentFolder,
   currentFilePath,
   sidebarVisible,
-  sidebarView,
   onToggleSidebar,
-  onSetSidebarView,
-  gitStatus,
   onEditorScroll,
   previewVisible,
   onTogglePreview,
@@ -152,46 +149,16 @@ const EditorArea = forwardRef(({
               </svg>
             </button>
 
-            {/* Git Source Control Button */}
-            <button
-              onClick={() => {
-                if (sidebarVisible && sidebarView === 'git') {
-                  onToggleSidebar(false);
-                } else {
-                  onSetSidebarView('git');
-                  onToggleSidebar(true);
-                }
-              }}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg backdrop-blur-sm shadow-md transition-all active:scale-95 relative ${sidebarVisible && sidebarView === 'git'
-                ? 'bg-blue-500/20 dark:bg-blue-500/30 border border-blue-400/50 dark:border-blue-400/50'
-                : 'bg-gray-100/80 dark:bg-gray-800/80 hover:bg-gray-200/90 dark:hover:bg-gray-700/90 border border-gray-300/50 dark:border-gray-600/50'
-                }`}
-              title="Source Control"
-            >
-              <svg className={`w-4 h-4 ${sidebarVisible && sidebarView === 'git' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-              </svg>
-              {/* 更改数量徽章 */}
-              {gitStatus?.hasChanges && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-md">
-                  {gitStatus.files?.length > 9 ? '9+' : gitStatus.files?.length}
-                </span>
-              )}
-            </button>
-
             {/* File Browser Button */}
             <button
-              onClick={() => {
-                onSetSidebarView('files');
-                onToggleSidebar(!sidebarVisible);
-              }}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg backdrop-blur-sm shadow-md transition-all active:scale-95 ${sidebarVisible && sidebarView === 'files'
+              onClick={() => onToggleSidebar(!sidebarVisible)}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg backdrop-blur-sm shadow-md transition-all active:scale-95 ${sidebarVisible
                 ? 'bg-blue-500/20 dark:bg-blue-500/30 border border-blue-400/50 dark:border-blue-400/50'
                 : 'bg-gray-100/80 dark:bg-gray-800/80 hover:bg-gray-200/90 dark:hover:bg-gray-700/90 border border-gray-300/50 dark:border-gray-600/50'
                 }`}
-              title={sidebarVisible && sidebarView === 'files' ? 'Hide Explorer' : 'Show Explorer'}
+              title={sidebarVisible ? 'Hide Explorer' : 'Show Explorer'}
             >
-              <svg className={`w-4 h-4 ${sidebarVisible && sidebarView === 'files' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-4 h-4 ${sidebarVisible ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
             </button>
