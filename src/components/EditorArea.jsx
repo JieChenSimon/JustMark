@@ -34,7 +34,20 @@ const EditorArea = forwardRef(({
         textarea.scrollTop = maxScroll * percentage;
       }
     },
-    getTextareaElement: () => textareaRef.current
+    getTextareaElement: () => textareaRef.current,
+    getSelection: () => {
+      if (!textareaRef.current) return null;
+      return {
+        start: textareaRef.current.selectionStart,
+        end: textareaRef.current.selectionEnd
+      };
+    },
+    setSelection: (start, end) => {
+      if (textareaRef.current) {
+        textareaRef.current.setSelectionRange(start, end);
+        textareaRef.current.focus();
+      }
+    }
   }));
 
   // 处理编辑器滚动事件

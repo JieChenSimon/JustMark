@@ -518,49 +518,36 @@ function App() {
   // 键盘快捷键处理
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // 如果正在输入新建名称，不处理快捷键
       if (inlineCreate) return;
 
+      // 检测 Mac 的 Cmd 键或 Windows/Linux 的 Ctrl 键
       const isMac = navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
       const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
 
       if (cmdOrCtrl) {
-        const key = e.key.toLowerCase();
-        const withShift = e.shiftKey;
-
-        if (key === 'n' && !withShift) {
-          e.preventDefault();
-          handleNew({ fromHotkey: true });
-        } else if (key === 'o' && !withShift) {
-          e.preventDefault();
-          handleOpen();
-        } else if (key === 's' && !withShift) {
-          e.preventDefault();
-          handleSave();
-        } else if (key === 's' && withShift) {
-          e.preventDefault();
-          handleSaveAs();
-        } else if (key === 'w' && !withShift) {
-          e.preventDefault();
-          handleCloseFile();
-        } else if (key === 'b' && !withShift) {
-          e.preventDefault();
-          handleFormatText('bold');
-        } else if (key === 'i' && !withShift) {
-          e.preventDefault();
-          handleFormatText('italic');
-        } else if (key === 'u' && !withShift) {
-          e.preventDefault();
-          handleFormatText('strikethrough');
-        } else if (key === 'k' && !withShift) {
-          e.preventDefault();
-          handleFormatText('link');
+        switch (e.key.toLowerCase()) {
+          case 'n':
+            e.preventDefault();
+            handleNew({ fromHotkey: true });
+            break;
+          case 'o':
+            e.preventDefault();
+            handleOpen();
+            break;
+          case 's':
+            e.preventDefault();
+            handleSave();
+            break;
+          default:
+            break;
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [hasUnsavedChanges, currentFilePath, markdown, inlineCreate, handleFormatText, handleCloseFile]);
+  }, [hasUnsavedChanges, currentFilePath, markdown, inlineCreate]);
 
   // 切换字体
   const handleFontChange = (index) => {
@@ -1119,80 +1106,6 @@ function App() {
       alert('❌ 保存失败: ' + error.message);
     }
   };
-
-  // 关闭当前文件
-  const handleCloseFile = useCallback(() => {
-    if (hasUnsavedChanges) {
-      const confirmed = confirm('当前文档有未保存的更改，确定要关闭吗？');
-      if (!confirmed) return;
-    }
-    setMarkdown('');
-    setCurrentFilePath(null);
-    setHasUnsavedChanges(false);
-  }, [hasUnsavedChanges]);
-
-  // 文本格式化
-  const handleFormatText = useCallback((format) => {
-    const textarea = editorAreaRef.current?.getTextareaElement();
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = markdown.substring(start, end);
-    const before = markdown.substring(0, start);
-    const after = markdown.substring(end);
-
-    let newText, newCursorPos;
-
-    switch (format) {
-      case 'bold':
-        if (selectedText) {
-          newText = `${before}**${selectedText}**${after}`;
-          newCursorPos = end + 4;
-        } else {
-          newText = `${before}****${after}`;
-          newCursorPos = start + 2;
-        }
-        break;
-      case 'italic':
-        if (selectedText) {
-          newText = `${before}*${selectedText}*${after}`;
-          newCursorPos = end + 2;
-        } else {
-          newText = `${before}**${after}`;
-          newCursorPos = start + 1;
-        }
-        break;
-      case 'strikethrough':
-        if (selectedText) {
-          newText = `${before}~~${selectedText}~~${after}`;
-          newCursorPos = end + 4;
-        } else {
-          newText = `${before}~~~~${after}`;
-          newCursorPos = start + 2;
-        }
-        break;
-      case 'link':
-        if (selectedText) {
-          newText = `${before}[${selectedText}](url)${after}`;
-          newCursorPos = end + 3;
-        } else {
-          newText = `${before}[text](url)${after}`;
-          newCursorPos = start + 1;
-        }
-        break;
-      default:
-        return;
-    }
-
-    setMarkdown(newText);
-    setHasUnsavedChanges(true);
-    
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(newCursorPos, newCursorPos);
-    }, 0);
-  }, [markdown, editorAreaRef]);
 
   // 自动保存
   useAutoSave(markdown, currentFilePath, hasUnsavedChanges, autoSaveEnabled, handleSave);
@@ -2597,25 +2510,6 @@ function App() {
           </div>
         </div>
       )}
-
-      {/* Word Count Status Bar */}
-      <div style={{
-        position: 'fixed',
-        bottom: 0,
-        right: 0,
-        padding: '4px 12px',
-        fontSize: '12px',
-        color: appTextColor,
-        opacity: 0.6,
-        backgroundColor: appBgColor,
-        borderTop: `1px solid ${isDarkMode ? '#333' : '#ddd'}`,
-        zIndex: 10
-      }}>
-        {chars} 字符 · {words} 单词 · {lines} 行
-      </div>
-    </div>
-  );
-}
 
       {/* Word Count Status Bar */}
       <div style={{
