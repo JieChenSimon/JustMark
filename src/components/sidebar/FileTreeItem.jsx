@@ -63,7 +63,8 @@ export const FileTreeItem = memo(function FileTreeItem({
     inlineInputRef,
     onInlineChange,
     onInlineConfirm,
-    onInlineCancel
+    onInlineCancel,
+    fileTags
 }) {
     const [children, setChildren] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -188,9 +189,23 @@ export const FileTreeItem = memo(function FileTreeItem({
                         autoComplete="off"
                     />
                 ) : (
-                    <span className={`truncate ${isSelected ? 'font-medium' : 'font-normal'}`}>
-                        {entry.name}
-                    </span>
+                    <>
+                        <span className={`truncate ${isSelected ? 'font-medium' : 'font-normal'}`}>
+                            {entry.name}
+                        </span>
+                        {!entry.isDirectory && fileTags && fileTags[fullPath] && fileTags[fullPath].length > 0 && (
+                            <div className="flex gap-0.5 ml-1 flex-shrink-0">
+                                {fileTags[fullPath].slice(0, 2).map((tag, i) => (
+                                    <span
+                                        key={i}
+                                        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                        style={{ backgroundColor: tag.color }}
+                                        title={tag.name}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </>
                 )}
             </button>
 
@@ -314,6 +329,7 @@ export const FileTreeItem = memo(function FileTreeItem({
                                 onInlineConfirm={onInlineConfirm}
                                 onInlineCancel={onInlineCancel}
                                 onSelectEntry={onSelectEntry}
+                                fileTags={fileTags}
                             />
                         ))
                     )}

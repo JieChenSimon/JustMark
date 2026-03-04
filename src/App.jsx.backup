@@ -71,11 +71,6 @@ const loadFileTags = () => {
   }
 };
 
-const getTagColor = (tagName) => {
-  const hash = tagName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return TAG_COLORS[hash % TAG_COLORS.length].color;
-};
-
 const saveFileTags = (tags) => {
   localStorage.setItem('justmark_file_tags', JSON.stringify(tags));
 };
@@ -100,7 +95,6 @@ function App() {
   }, []);
 
   const [markdown, setMarkdown] = useState("### JustMark\n Write in a single way...");
-  const [debouncedMarkdown, setDebouncedMarkdown] = useState(markdown);
 
   // === 主题管理 ===
   const theme = useTheme();
@@ -215,11 +209,16 @@ function App() {
   const [selectedSidebarEntry, setSelectedSidebarEntry] = useState(null);
   const [showNewMenu, setShowNewMenu] = useState(false);
   const newMenuRef = useRef(null);
+  const tagMenuRef = useRef(null);
   const [inlineCreate, setInlineCreate] = useState(null);
   const inlineCreateInputRef = useRef(null);
 
   // 文件搜索
   const [fileSearchQuery, setFileSearchQuery] = useState('');
+
+  // 标签系统
+  const [allTags, setAllTags] = useState(new Set()); // 所有标签集合
+  const [selectedTag, setSelectedTag] = useState(null); // 选中的标签过滤
 
   // 保存状态到 localStorage（主题/设置/窗口管理已在 hooks 中处理）
   useEffect(() => { saveState('currentFilePath', currentFilePath); }, [currentFilePath]);
@@ -230,10 +229,18 @@ function App() {
   useEffect(() => { saveState('currentFolder', currentFolder); }, [currentFolder]);
   useEffect(() => { saveState('expandedFolders', Array.from(expandedFolders)); }, [expandedFolders]);
 
-  // 保存标签数据
+  // 定义 loadFolderContents 函数需要在这里之前声明
+  // 恢复逻辑将在 loadFolderContents 定义之后添加
+
+  // 解析当前文件的标签
   useEffect(() => {
-    saveFileTags(fileTags);
-  }, [fileTags]);
+    if (currentFilePath && markdown) {
+      const tags = parseFrontmatterTags(markdown);
+      setCurrentTags(tags);
+    } else {
+      setCurrentTags([]);
+    }
+  }, [currentFilePath, markdown]);
 
   // PDF 自动缩放以适应窗口和拖动
   useEffect(() => {
@@ -423,19 +430,18 @@ function App() {
   }, [showNewMenu]);
 
   // 监听标签菜单的外部点击关闭
-  // 点击外部关闭标签菜单
   useEffect(() => {
-    if (!tagMenuOpen) return;
+    if (!showTagMenu) return;
 
     const handleClickOutside = (e) => {
-      if (!e.target.closest('.tag-menu')) {
-        setTagMenuOpen(null);
+      if (tagMenuRef.current && !tagMenuRef.current.contains(e.target)) {
+        setShowTagMenu(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [tagMenuOpen]);
+  }, [showTagMenu]);
 
   // 当切换根目录时重置选择和菜单状态
   useEffect(() => {
@@ -779,19 +785,27 @@ function App() {
     if (currentTags.includes(tag)) {
       setTagInput('');
       return;
-  // 彩色标签处理函数
-  const toggleFileTag = useCallback((filePath, colorName) => {
-    setFileTags(prev => {
-      const current = prev[filePath] || [];
-      const newTags = current.includes(colorName)
-        ? current.filter(c => c !== colorName)
-        : [...current, colorName];
-      
-      return newTags.length > 0 
-        ? { ...prev, [filePath]: newTags }
-        : Object.fromEntries(Object.entries(prev).filter(([k]) => k !== filePath));
-    });
-  }, []);
+    }
+
+    const newTags = [...currentTags, tag];
+    const updatedContent = updateFrontmatterTags(markdown, newTags);
+    
+    setMarkdown(updatedContent);
+    setCurrentTags(newTags);
+    setTagInput('');
+    setHasUnsavedChanges(true);
+  };
+
+  const handleRemoveTag = async (tagToRemove) => {
+    if (!currentFilePath) return;
+    
+    const newTags = currentTags.filter(t => t !== tagToRemove);
+    const updatedContent = updateFrontmatterTags(markdown, newTags);
+    
+    setMarkdown(updatedContent);
+    setCurrentTags(newTags);
+    setHasUnsavedChanges(true);
+  };
 
   // 切换文件夹展开/折叠
   const toggleFolder = useCallback(async (folderPath) => {
@@ -825,31 +839,10 @@ function App() {
       const entries = await readDir(folderPath);
       setFolderContents(sortEntries(entries));
       setExpandedFolders(new Set([folderPath]));
-      
-      // 并行扫描当前层级的 .md 文件标签
-      const scanCurrentLevel = async () => {
-        const mdFiles = entries.filter(item => !item.isDirectory && item.name.endsWith('.md'));
-        const results = await Promise.all(
-          mdFiles.map(async item => {
-            const fullPath = `${folderPath}/${item.name}`;
-            try {
-              const content = await readTextFile(fullPath);
-              const tags = parseTags(content);
-              return tags.length > 0 ? { fullPath, tags: tags.map(name => ({ name, color: getTagColor(name) })) } : null;
-            } catch (e) {
-              return null;
-            }
-          })
-        );
-        const tagMap = {};
-        results.forEach(r => r && (tagMap[r.fullPath] = r.tags));
-        setFileTags(prev => ({ ...prev, ...tagMap }));
-      };
-      scanCurrentLevel();
     } catch (error) {
       console.error('读取文件夹失败:', error);
     }
-  }, [sortEntries, parseTags]);
+  }, [sortEntries]);
 
   // 递归读取子文件夹内容
   const getSubfolderContents = useCallback(async (folderPath) => {
@@ -1279,7 +1272,7 @@ function App() {
   // 使用 useMemo 缓存 markdown 渲染内容，避免主题切换时重新渲染
   const renderedMarkdown = useMemo(() => {
     // Pre-process markdown to convert Obsidian syntax to standard markdown
-    const processedMarkdown = debouncedMarkdown.replace(
+    const processedMarkdown = markdown.replace(
       /!\[\[([^\]]+\.(png|jpg|jpeg|gif|webp|svg|bmp|ico))\]\]/gi,
       (match, filename) => {
         // URL encode the entire path to handle spaces and special characters
@@ -1292,7 +1285,7 @@ function App() {
     );
 
     // Debug: show a sample of processedMarkdown
-    if (processedMarkdown !== debouncedMarkdown) {
+    if (processedMarkdown !== markdown) {
       const sample = processedMarkdown.substring(0, 500);
       console.log('📝 Processed markdown sample:', sample);
     }
@@ -1342,13 +1335,7 @@ function App() {
         {processedMarkdown}
       </ReactMarkdown>
     );
-  }, [debouncedMarkdown, currentFolder, currentFilePath, attachmentFolder]);
-
-  // Debounce markdown for preview
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedMarkdown(markdown), 300);
-    return () => clearTimeout(timer);
-  }, [markdown]);
+  }, [markdown, currentFolder, currentFilePath, attachmentFolder]);
 
   // 应用启动时恢复上次打开的文件和文件夹
   useEffect(() => {
@@ -1707,6 +1694,53 @@ function App() {
           {/* 右侧：功能按钮 */}
           <div className="w-40 flex items-center justify-end gap-2 relative">
 
+            {/* 标签管理按钮 */}
+            {currentFilePath && currentFilePath.endsWith('.md') && (
+              <div className="relative" ref={tagMenuRef}>
+                <button
+                  onClick={() => setShowTagMenu(!showTagMenu)}
+                  className="w-6 h-6 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800 transition-all active:scale-95"
+                  title="标签"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                </button>
+
+                {showTagMenu && (
+                  <div className="absolute right-0 top-8 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 p-2">
+                    <div className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-2 px-1">当前标签</div>
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {currentTags.length === 0 ? (
+                        <div className="text-[10px] text-gray-400 px-1">无标签</div>
+                      ) : (
+                        currentTags.map((tag, i) => (
+                          <span key={i} className="px-2 py-0.5 text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded flex items-center gap-1">
+                            {tag}
+                            <button onClick={() => handleRemoveTag(tag)} className="hover:text-red-600">×</button>
+                          </span>
+                        ))
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      placeholder="添加标签..."
+                      className="w-full px-2 py-1 text-[10px] border rounded bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      style={{ color: appTextColor, borderColor: 'rgba(0, 0, 0, 0.2)' }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddTag();
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* 字体选择器 */}
             <div className="relative">
               <button
@@ -2015,7 +2049,6 @@ function App() {
                       onInlineConfirm={confirmInlineCreate}
                       onInlineCancel={cancelInlineCreate}
                       onSelectEntry={handleSelectSidebarEntry}
-                      fileTags={fileTags}
                     />
                   ))}
                 </div>
