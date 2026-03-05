@@ -68,6 +68,7 @@ function App() {
 
   const [markdown, setMarkdown] = useState("### JustMark\n Write in a single way...");
   const [debouncedMarkdown, setDebouncedMarkdown] = useState(markdown);
+  const markdownRef = useRef(markdown);
 
   // === 主题管理 ===
   const theme = useTheme();
@@ -193,6 +194,9 @@ function App() {
 
   // 文件搜索
   const [fileSearchQuery, setFileSearchQuery] = useState('');
+  const [selectedTag, setSelectedTag] = useState(null);
+  const [tagInput, setTagInput] = useState('');
+  const [currentTags, setCurrentTags] = useState([]);
 
   // PDF 自动缩放以适应窗口和拖动
   useEffect(() => {
@@ -257,6 +261,11 @@ function App() {
       window.removeEventListener('dragover', handleDragOver);
     };
   }, [addRecentFile]);
+
+  // 保持 markdownRef 始终指向最新内容，供稳定回调读取
+  useEffect(() => {
+    markdownRef.current = markdown;
+  }, [markdown]);
 
   // 窗口关闭前的未保存警告
   useEffect(() => {
@@ -487,52 +496,69 @@ function App() {
     };
   }, [inlineCreate]);
 
-  // 键盘快捷键处理
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (inlineCreate) return;
+  // 文本格式化处理
+  const handleFormatText = useCallback((format) => {
+    const textarea = editorAreaRef.current?.getTextareaElement();
+    if (!textarea) return;
 
-      const isMac = navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
-      const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentMarkdown = markdownRef.current;
+    const selectedText = currentMarkdown.substring(start, end);
+    const before = currentMarkdown.substring(0, start);
+    const after = currentMarkdown.substring(end);
 
-      if (cmdOrCtrl) {
-        const key = e.key.toLowerCase();
-        const withShift = e.shiftKey;
+    let newText, newCursorPos;
 
-        if (key === 'n' && !withShift) {
-          e.preventDefault();
-          handleNew({ fromHotkey: true });
-        } else if (key === 'o' && !withShift) {
-          e.preventDefault();
-          handleOpen();
-        } else if (key === 's' && !withShift) {
-          e.preventDefault();
-          handleSave();
-        } else if (key === 's' && withShift) {
-          e.preventDefault();
-          handleSaveAs();
-        } else if (key === 'w' && !withShift) {
-          e.preventDefault();
-          handleCloseFile();
-        } else if (key === 'b' && !withShift) {
-          e.preventDefault();
-          handleFormatText('bold');
-        } else if (key === 'i' && !withShift) {
-          e.preventDefault();
-          handleFormatText('italic');
-        } else if (key === 'u' && !withShift) {
-          e.preventDefault();
-          handleFormatText('strikethrough');
-        } else if (key === 'k' && !withShift) {
-          e.preventDefault();
-          handleFormatText('link');
+    switch (format) {
+      case 'bold':
+        if (selectedText) {
+          newText = `${before}**${selectedText}**${after}`;
+          newCursorPos = end + 4;
+        } else {
+          newText = `${before}****${after}`;
+          newCursorPos = start + 2;
         }
-      }
-    };
+        break;
+      case 'italic':
+        if (selectedText) {
+          newText = `${before}*${selectedText}*${after}`;
+          newCursorPos = end + 2;
+        } else {
+          newText = `${before}**${after}`;
+          newCursorPos = start + 1;
+        }
+        break;
+      case 'strikethrough':
+        if (selectedText) {
+          newText = `${before}~~${selectedText}~~${after}`;
+          newCursorPos = end + 4;
+        } else {
+          newText = `${before}~~~~${after}`;
+          newCursorPos = start + 2;
+        }
+        break;
+      case 'link':
+        if (selectedText) {
+          newText = `${before}[${selectedText}](url)${after}`;
+          newCursorPos = end + 3;
+        } else {
+          newText = `${before}[text](url)${after}`;
+          newCursorPos = start + 1;
+        }
+        break;
+      default:
+        return;
+    }
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [hasUnsavedChanges, currentFilePath, markdown, inlineCreate, handleFormatText, handleCloseFile]);
+    setMarkdown(newText);
+    setHasUnsavedChanges(true);
+    
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    }, 0);
+  }, []);
 
   // 切换字体
   const handleFontChange = (index) => {
@@ -764,6 +790,9 @@ function App() {
     if (currentTags.includes(tag)) {
       setTagInput('');
       return;
+    }
+  };
+
   // 彩色标签处理函数
   const toggleFileTag = useCallback((filePath, colorName) => {
     setFileTags(prev => {
@@ -803,6 +832,18 @@ function App() {
       return a.name.localeCompare(b.name);
     });
   }, [fileSortBy]);
+
+  // 解析 frontmatter 中的标签
+  const parseTags = useCallback((content) => {
+    const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+    if (!frontmatterMatch) return [];
+    
+    const frontmatter = frontmatterMatch[1];
+    const tagsMatch = frontmatter.match(/tags:\s*\[(.*?)\]/);
+    if (!tagsMatch) return [];
+    
+    return tagsMatch[1].split(',').map(tag => tag.trim().replace(/['"]/g, '')).filter(Boolean);
+  }, []);
 
   const loadFolderContents = useCallback(async (folderPath) => {
     try {
@@ -873,18 +914,6 @@ function App() {
     
     return filtered;
   }, [folderContents, fileSearchQuery, selectedTag]);
-
-  // 解析 frontmatter 中的标签
-  const parseTags = useCallback((content) => {
-    const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
-    if (!frontmatterMatch) return [];
-    
-    const frontmatter = frontmatterMatch[1];
-    const tagsMatch = frontmatter.match(/tags:\s*\[(.*?)\]/);
-    if (!tagsMatch) return [];
-    
-    return tagsMatch[1].split(',').map(tag => tag.trim().replace(/['"]/g, '')).filter(Boolean);
-  }, []);
 
   // 从侧边栏打开文件
   const handleOpenFileFromSidebar = useCallback(async (filePath) => {
@@ -1111,68 +1140,52 @@ function App() {
     setHasUnsavedChanges(false);
   }, [hasUnsavedChanges]);
 
-  // 文本格式化
-  const handleFormatText = useCallback((format) => {
-    const textarea = editorAreaRef.current?.getTextareaElement();
-    if (!textarea) return;
+  // 键盘快捷键处理
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (inlineCreate) return;
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = markdown.substring(start, end);
-    const before = markdown.substring(0, start);
-    const after = markdown.substring(end);
+      const isMac = navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+      const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
 
-    let newText, newCursorPos;
+      if (cmdOrCtrl) {
+        const key = e.key.toLowerCase();
+        const withShift = e.shiftKey;
 
-    switch (format) {
-      case 'bold':
-        if (selectedText) {
-          newText = `${before}**${selectedText}**${after}`;
-          newCursorPos = end + 4;
-        } else {
-          newText = `${before}****${after}`;
-          newCursorPos = start + 2;
+        if (key === 'n' && !withShift) {
+          e.preventDefault();
+          handleNew({ fromHotkey: true });
+        } else if (key === 'o' && !withShift) {
+          e.preventDefault();
+          handleOpen();
+        } else if (key === 's' && !withShift) {
+          e.preventDefault();
+          handleSave();
+        } else if (key === 's' && withShift) {
+          e.preventDefault();
+          handleSaveAs();
+        } else if (key === 'w' && !withShift) {
+          e.preventDefault();
+          handleCloseFile();
+        } else if (key === 'b' && !withShift) {
+          e.preventDefault();
+          handleFormatText('bold');
+        } else if (key === 'i' && !withShift) {
+          e.preventDefault();
+          handleFormatText('italic');
+        } else if (key === 'u' && !withShift) {
+          e.preventDefault();
+          handleFormatText('strikethrough');
+        } else if (key === 'k' && !withShift) {
+          e.preventDefault();
+          handleFormatText('link');
         }
-        break;
-      case 'italic':
-        if (selectedText) {
-          newText = `${before}*${selectedText}*${after}`;
-          newCursorPos = end + 2;
-        } else {
-          newText = `${before}**${after}`;
-          newCursorPos = start + 1;
-        }
-        break;
-      case 'strikethrough':
-        if (selectedText) {
-          newText = `${before}~~${selectedText}~~${after}`;
-          newCursorPos = end + 4;
-        } else {
-          newText = `${before}~~~~${after}`;
-          newCursorPos = start + 2;
-        }
-        break;
-      case 'link':
-        if (selectedText) {
-          newText = `${before}[${selectedText}](url)${after}`;
-          newCursorPos = end + 3;
-        } else {
-          newText = `${before}[text](url)${after}`;
-          newCursorPos = start + 1;
-        }
-        break;
-      default:
-        return;
-    }
+      }
+    };
 
-    setMarkdown(newText);
-    setHasUnsavedChanges(true);
-    
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(newCursorPos, newCursorPos);
-    }, 0);
-  }, [markdown, editorAreaRef]);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [inlineCreate, handleNew, handleOpen, handleSave, handleSaveAs, handleCloseFile, handleFormatText]);
 
   // 自动保存
   useAutoSave(markdown, currentFilePath, hasUnsavedChanges, autoSaveEnabled, handleSave);
@@ -2033,6 +2046,7 @@ function App() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
+                </div>
 
                 {/* 文件搜索框 */}
                 <div className="px-2 py-2 border-b" style={{ borderBottomColor: 'rgba(0, 0, 0, 0.1)' }}>
@@ -2100,6 +2114,7 @@ function App() {
                     />
                   ))}
                 </div>
+              </div>
 
               {/* 侧边栏拖动条 */}
               <div
@@ -2107,6 +2122,7 @@ function App() {
                 onMouseDown={() => setIsDraggingSidebar(true)}
               >
                 <div className="absolute inset-y-0 -left-2 -right-2" />
+              </div>
             </>
           )}
 
@@ -2136,6 +2152,7 @@ function App() {
             onMouseDown={() => setIsDraggingEditor(true)}
           >
             <div className="absolute inset-y-0 -left-2 -right-2" />
+          </div>
         )}
 
         {/* 右侧：预览区 */}
@@ -2527,6 +2544,8 @@ function App() {
                   <article>
                     {renderedMarkdown}
                   </article>
+                </div>
+              </div>
             )}
           </section>
         )}
