@@ -19,38 +19,17 @@ import { useWindowManager } from './hooks/useWindowManager';
 import { useAutoSave } from './hooks/useAutoSave';
 import { useRecentFiles } from './hooks/useRecentFiles';
 import { useWordCount } from './hooks/useWordCount';
+import { useLocalStorage } from './hooks/useLocalStorage';
 import useWebDAVSync from './hooks/useWebDAVSync';
 import PreviewColorPicker from './components/PreviewColorPicker';
 import EditorArea from './components/EditorArea';
 import ConfirmDialog from './components/ConfirmDialog';
 import WebDAVSettings from './components/WebDAVSettings';
+import TableOfContents from './components/TableOfContents';
 import { remarkObsidianImage } from './utils/remarkObsidianImage';
 import { FileTreeItem, InlineCreateRow } from './components/sidebar/FileTreeItem';
 
 import { HEADER_HEIGHT, FONT_FAMILIES, FONT_OPTIONS, BACKGROUND_COLORS } from './constants/theme';
-
-
-// 从 localStorage 加载保存的状态
-const loadSavedState = (key, defaultValue) => {
-  try {
-    const saved = localStorage.getItem(key);
-    if (saved !== null) {
-      return JSON.parse(saved);
-    }
-  } catch (error) {
-    console.error(`加载状态失败 (${key}):`, error);
-  }
-  return defaultValue;
-};
-
-// 保存状态到 localStorage
-const saveState = (key, value) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.error(`保存状态失败 (${key}):`, error);
-  }
-};
 
 // macOS Finder 风格彩色标签
 const TAG_COLORS = [
@@ -63,23 +42,9 @@ const TAG_COLORS = [
   { name: 'gray', color: '#8E8E93' }
 ];
 
-// 标签存储管理
-const loadFileTags = () => {
-  try {
-    const saved = localStorage.getItem('justmark_file_tags');
-    return saved ? JSON.parse(saved) : {};
-  } catch {
-    return {};
-  }
-};
-
 const getTagColor = (tagName) => {
   const hash = tagName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return TAG_COLORS[hash % TAG_COLORS.length].color;
-};
-
-const saveFileTags = (tags) => {
-  localStorage.setItem('justmark_file_tags', JSON.stringify(tags));
 };
 
 function App() {
@@ -146,23 +111,19 @@ function App() {
   } = useWindowManager();
 
   const [isExporting, setIsExporting] = useState(false);
-  const [currentFilePath, setCurrentFilePath] = useState(() => loadSavedState('currentFilePath', null));
+  const [currentFilePath, setCurrentFilePath] = useLocalStorage('currentFilePath', null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showOpenMenu, setShowOpenMenu] = useState(false);
   const [showTagMenu, setShowTagMenu] = useState(false);
-  // 彩色标签系统
-  const [fileTags, setFileTags] = useState(() => loadFileTags());
-  const [tagMenuOpen, setTagMenuOpen] = useState(null); // { path: string, x: number, y: number }
+  const [fileTags, setFileTags] = useLocalStorage('justmark_file_tags', {});
+  const [tagMenuOpen, setTagMenuOpen] = useState(null);
   
-  const [previewMode, setPreviewMode] = useState(() => loadSavedState('previewMode', 'markdown'));
+  const [previewMode, setPreviewMode] = useLocalStorage('previewMode', 'markdown');
   const [showIndicator, setShowIndicator] = useState(true);
-  const [sidebarVisible, setSidebarVisible] = useState(() => loadSavedState('sidebarVisible', false));
-  const [currentFolder, setCurrentFolder] = useState(() => loadSavedState('currentFolder', null));
+  const [sidebarVisible, setSidebarVisible] = useLocalStorage('sidebarVisible', false);
+  const [currentFolder, setCurrentFolder] = useLocalStorage('currentFolder', null);
   const [folderContents, setFolderContents] = useState([]);
-  const [expandedFolders, setExpandedFolders] = useState(() => {
-    const saved = loadSavedState('expandedFolders', []);
-    return new Set(saved);
-  });
+  const [expandedFolders, setExpandedFolders] = useState(new Set());
   const [folderRefreshTimestamps, setFolderRefreshTimestamps] = useState({});
   const indicatorTimeoutRef = useRef(null);
   const warningTimeoutRef = useRef(null);
@@ -178,7 +139,13 @@ function App() {
   const [showClipError, setShowClipError] = useState(false);
 
   // Preview panel visibility
-  const [previewVisible, setPreviewVisible] = useState(() => loadSavedState('previewVisible', true));
+  const [previewVisible, setPreviewVisible] = useLocalStorage('previewVisible', true);
+
+  // TOC visibility
+  const [tocVisible, setTocVisible] = useLocalStorage('tocVisible', false);
+
+  // Last saved timestamp
+  const [lastSaved, setLastSaved] = useState(null);
 
   // Confirm dialog state
   const [confirmDialog, setConfirmDialog] = useState({
@@ -226,20 +193,6 @@ function App() {
 
   // 文件搜索
   const [fileSearchQuery, setFileSearchQuery] = useState('');
-
-  // 保存状态到 localStorage（主题/设置/窗口管理已在 hooks 中处理）
-  useEffect(() => { saveState('currentFilePath', currentFilePath); }, [currentFilePath]);
-  useEffect(() => { saveState('previewMode', previewMode); }, [previewMode]);
-  useEffect(() => { saveState('previewVisible', previewVisible); }, [previewVisible]);
-  useEffect(() => { saveState('sidebarVisible', sidebarVisible); }, [sidebarVisible]);
-
-  useEffect(() => { saveState('currentFolder', currentFolder); }, [currentFolder]);
-  useEffect(() => { saveState('expandedFolders', Array.from(expandedFolders)); }, [expandedFolders]);
-
-  // 保存标签数据
-  useEffect(() => {
-    saveFileTags(fileTags);
-  }, [fileTags]);
 
   // PDF 自动缩放以适应窗口和拖动
   useEffect(() => {
@@ -304,6 +257,19 @@ function App() {
       window.removeEventListener('dragover', handleDragOver);
     };
   }, [addRecentFile]);
+
+  // 窗口关闭前的未保存警告
+  useEffect(() => {
+    const handleBeforeUnload = async (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // 显示指示器并设置自动隐藏
   const showPreviewIndicator = () => {
@@ -1095,6 +1061,7 @@ function App() {
       // 直接保存到当前文件
       await writeTextFile(filePath, markdown);
       setHasUnsavedChanges(false);
+      setLastSaved(new Date());
       addRecentFile(filePath);
 
       // WebDAV 自动同步
@@ -1453,67 +1420,43 @@ function App() {
   // 应用启动时恢复上次打开的文件和文件夹
   useEffect(() => {
     const restoreLastSession = async () => {
-      const savedFilePath = loadSavedState('currentFilePath', null);
-      const savedFolder = loadSavedState('currentFolder', null);
-      const savedExpandedFolders = loadSavedState('expandedFolders', []);
-      const savedSidebarVisible = loadSavedState('sidebarVisible', false);
-
       console.log('🔄 恢复会话:', {
-        savedFolder,
-        savedFilePath,
-        savedExpandedFolders,
-        savedSidebarVisible
+        currentFolder,
+        currentFilePath,
+        sidebarVisible
       });
 
-      // 如果有保存的文件夹，加载文件夹内容并显示侧边栏
-      if (savedFolder) {
+      // 如果有保存的文件夹，加载文件夹内容
+      if (currentFolder) {
         try {
-          // 确保侧边栏可见
-          if (savedSidebarVisible) {
-            setSidebarVisible(true);
-          }
-
-          // 先加载文件夹内容
-          await loadFolderContents(savedFolder);
+          await loadFolderContents(currentFolder);
           console.log('✅ 文件夹内容已加载');
-
-          // 然后恢复展开的文件夹状态
-          if (savedExpandedFolders && savedExpandedFolders.length > 0) {
-            console.log('📂 恢复展开的文件夹:', savedExpandedFolders);
-            // 使用 setTimeout 确保状态更新在下一个事件循环
-            setTimeout(() => {
-              setExpandedFolders(new Set(savedExpandedFolders));
-            }, 50);
-          }
         } catch (error) {
           console.error('❌ 无法恢复文件夹:', error);
-          saveState('currentFolder', null);
+          setCurrentFolder(null);
         }
       }
 
       // 如果有保存的文件，尝试加载
-      if (savedFilePath) {
+      if (currentFilePath) {
         try {
-          const content = await readTextFile(savedFilePath);
+          const content = await readTextFile(currentFilePath);
           setMarkdown(content);
           setHasUnsavedChanges(false);
-          console.log('✅ 成功恢复文件:', savedFilePath);
+          console.log('✅ 成功恢复文件:', currentFilePath);
         } catch (error) {
           console.error('❌ 无法恢复文件:', error);
-          // 文件不存在或无法读取，清除保存的路径
-          saveState('currentFilePath', null);
           setCurrentFilePath(null);
         }
       }
     };
 
-    // 延迟执行，确保组件完全挂载
     const timer = setTimeout(() => {
       restoreLastSession();
     }, 200);
 
     return () => clearTimeout(timer);
-  }, []); // 空依赖数组，只在组件挂载时运行一次
+  }, []);
 
   return (
     <div
@@ -1990,17 +1933,23 @@ function App() {
               )}
             </div>
 
+            {/* TOC 切换按钮 */}
+            <button
+              onClick={() => setTocVisible(!tocVisible)}
+              className="w-6 h-6 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800 transition-all active:scale-95"
+              title={tocVisible ? '隐藏目录' : '显示目录'}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+              </svg>
+            </button>
+
             {/* Settings按钮 */}
             <button
               onClick={() => setShowSettingsDialog(true)}
               className="w-6 h-6 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800 transition-all active:scale-95"
               title="Settings"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </button>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -2239,7 +2188,17 @@ function App() {
 
             {previewMode === 'markdown' ? (
               /* Markdown 预览模式 - 正常网页效果 */
-              <div className="w-full max-w-4xl p-6">
+              <div className="w-full max-w-4xl p-6 flex gap-6">
+                {/* TOC 组件 */}
+                {tocVisible && (
+                  <TableOfContents
+                    markdown={markdown}
+                    onHeadingClick={(id) => {
+                      const element = document.getElementById(id);
+                      if (element) element.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                  />
+                )}
                 <article
                   className="prose max-w-none prose-headings:font-semibold"
                   style={{
@@ -2643,25 +2602,6 @@ function App() {
           </div>
         </div>
       )}
-
-      {/* Word Count Status Bar */}
-      <div style={{
-        position: 'fixed',
-        bottom: 0,
-        right: 0,
-        padding: '4px 12px',
-        fontSize: '12px',
-        color: appTextColor,
-        opacity: 0.6,
-        backgroundColor: appBgColor,
-        borderTop: `1px solid ${isDarkMode ? '#333' : '#ddd'}`,
-        zIndex: 10
-      }}>
-        {chars} 字符 · {words} 单词 · {lines} 行
-      </div>
-    </div>
-  );
-}
 
       {/* Word Count Status Bar */}
       <div style={{
