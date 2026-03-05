@@ -19,9 +19,11 @@ import { useWindowManager } from './hooks/useWindowManager';
 import { useAutoSave } from './hooks/useAutoSave';
 import { useRecentFiles } from './hooks/useRecentFiles';
 import { useWordCount } from './hooks/useWordCount';
+import useWebDAVSync from './hooks/useWebDAVSync';
 import PreviewColorPicker from './components/PreviewColorPicker';
 import EditorArea from './components/EditorArea';
 import ConfirmDialog from './components/ConfirmDialog';
+import WebDAVSettings from './components/WebDAVSettings';
 import { remarkObsidianImage } from './utils/remarkObsidianImage';
 import { FileTreeItem, InlineCreateRow } from './components/sidebar/FileTreeItem';
 
@@ -186,6 +188,10 @@ function App() {
     onConfirm: null,
     position: null
   });
+
+  // WebDAV state
+  const [showWebDAVSettings, setShowWebDAVSettings] = useState(false);
+  const { syncing, syncToWebDAV } = useWebDAVSync();
 
   // 处理编辑器滚动同步到预览区
   const handleEditorScroll = (scrollPercentage) => {
@@ -1090,11 +1096,18 @@ function App() {
       await writeTextFile(filePath, markdown);
       setHasUnsavedChanges(false);
       addRecentFile(filePath);
+
+      // WebDAV 自动同步
+      const webdavConfig = localStorage.getItem('webdav_config');
+      if (webdavConfig) {
+        const filename = filePath.split('/').pop();
+        await syncToWebDAV(filename, markdown);
+      }
     } catch (error) {
       console.error('保存文件失败:', error);
       alert('❌ 保存失败: ' + error.message);
     }
-  }, [currentFilePath, markdown, addRecentFile]);
+  }, [currentFilePath, markdown, addRecentFile, syncToWebDAV]);
 
   // 另存为
   const handleSaveAs = async () => {
@@ -1949,12 +1962,45 @@ function App() {
               )}
             </div>
 
+            {/* WebDAV 同步按钮 */}
+            <div className="relative">
+              <button
+                onClick={() => setShowWebDAVSettings(true)}
+                disabled={syncing}
+                className="w-6 h-6 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800 transition-all active:scale-95 disabled:opacity-50"
+                title={syncing ? "Syncing..." : "WebDAV Sync"}
+              >
+                {syncing ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                  </svg>
+                )}
+              </button>
+              {syncing && (
+                <div className="absolute right-0 top-8 px-2 py-1 rounded bg-blue-50 dark:bg-blue-900/50 shadow-lg border border-blue-200 dark:border-blue-700 z-50">
+                  <div className="text-xs text-blue-600 dark:text-blue-300 whitespace-nowrap">
+                    Syncing...
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Settings按钮 */}
             <button
               onClick={() => setShowSettingsDialog(true)}
               className="w-6 h-6 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800 transition-all active:scale-95"
               title="Settings"
             >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -2632,6 +2678,11 @@ function App() {
       }}>
         {chars} 字符 · {words} 单词 · {lines} 行
       </div>
+
+      {/* WebDAV Settings Dialog */}
+      {showWebDAVSettings && (
+        <WebDAVSettings onClose={() => setShowWebDAVSettings(false)} />
+      )}
     </div>
   );
 }
