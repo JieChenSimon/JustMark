@@ -19,36 +19,17 @@ import { useWindowManager } from './hooks/useWindowManager';
 import { useAutoSave } from './hooks/useAutoSave';
 import { useRecentFiles } from './hooks/useRecentFiles';
 import { useWordCount } from './hooks/useWordCount';
+import { useLocalStorage } from './hooks/useLocalStorage';
+import useWebDAVSync from './hooks/useWebDAVSync';
 import PreviewColorPicker from './components/PreviewColorPicker';
 import EditorArea from './components/EditorArea';
 import ConfirmDialog from './components/ConfirmDialog';
+import WebDAVSettings from './components/WebDAVSettings';
+import TableOfContents from './components/TableOfContents';
 import { remarkObsidianImage } from './utils/remarkObsidianImage';
 import { FileTreeItem, InlineCreateRow } from './components/sidebar/FileTreeItem';
 
 import { HEADER_HEIGHT, FONT_FAMILIES, FONT_OPTIONS, BACKGROUND_COLORS } from './constants/theme';
-
-
-// 从 localStorage 加载保存的状态
-const loadSavedState = (key, defaultValue) => {
-  try {
-    const saved = localStorage.getItem(key);
-    if (saved !== null) {
-      return JSON.parse(saved);
-    }
-  } catch (error) {
-    console.error(`加载状态失败 (${key}):`, error);
-  }
-  return defaultValue;
-};
-
-// 保存状态到 localStorage
-const saveState = (key, value) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.error(`保存状态失败 (${key}):`, error);
-  }
-};
 
 // macOS Finder 风格彩色标签
 const TAG_COLORS = [
@@ -61,18 +42,9 @@ const TAG_COLORS = [
   { name: 'gray', color: '#8E8E93' }
 ];
 
-// 标签存储管理
-const loadFileTags = () => {
-  try {
-    const saved = localStorage.getItem('justmark_file_tags');
-    return saved ? JSON.parse(saved) : {};
-  } catch {
-    return {};
-  }
-};
-
-const saveFileTags = (tags) => {
-  localStorage.setItem('justmark_file_tags', JSON.stringify(tags));
+const getTagColor = (tagName) => {
+  const hash = tagName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return TAG_COLORS[hash % TAG_COLORS.length].color;
 };
 
 function App() {
@@ -95,6 +67,7 @@ function App() {
   }, []);
 
   const [markdown, setMarkdown] = useState("### JustMark\n Write in a single way...");
+  const [debouncedMarkdown, setDebouncedMarkdown] = useState(markdown);
 
   // === 主题管理 ===
   const theme = useTheme();
@@ -138,23 +111,19 @@ function App() {
   } = useWindowManager();
 
   const [isExporting, setIsExporting] = useState(false);
-  const [currentFilePath, setCurrentFilePath] = useState(() => loadSavedState('currentFilePath', null));
+  const [currentFilePath, setCurrentFilePath] = useLocalStorage('currentFilePath', null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showOpenMenu, setShowOpenMenu] = useState(false);
   const [showTagMenu, setShowTagMenu] = useState(false);
-  // 彩色标签系统
-  const [fileTags, setFileTags] = useState(() => loadFileTags());
-  const [tagMenuOpen, setTagMenuOpen] = useState(null); // { path: string, x: number, y: number }
+  const [fileTags, setFileTags] = useLocalStorage('justmark_file_tags', {});
+  const [tagMenuOpen, setTagMenuOpen] = useState(null);
   
-  const [previewMode, setPreviewMode] = useState(() => loadSavedState('previewMode', 'markdown'));
+  const [previewMode, setPreviewMode] = useLocalStorage('previewMode', 'markdown');
   const [showIndicator, setShowIndicator] = useState(true);
-  const [sidebarVisible, setSidebarVisible] = useState(() => loadSavedState('sidebarVisible', false));
-  const [currentFolder, setCurrentFolder] = useState(() => loadSavedState('currentFolder', null));
+  const [sidebarVisible, setSidebarVisible] = useLocalStorage('sidebarVisible', false);
+  const [currentFolder, setCurrentFolder] = useLocalStorage('currentFolder', null);
   const [folderContents, setFolderContents] = useState([]);
-  const [expandedFolders, setExpandedFolders] = useState(() => {
-    const saved = loadSavedState('expandedFolders', []);
-    return new Set(saved);
-  });
+  const [expandedFolders, setExpandedFolders] = useState(new Set());
   const [folderRefreshTimestamps, setFolderRefreshTimestamps] = useState({});
   const indicatorTimeoutRef = useRef(null);
   const warningTimeoutRef = useRef(null);
@@ -170,7 +139,13 @@ function App() {
   const [showClipError, setShowClipError] = useState(false);
 
   // Preview panel visibility
-  const [previewVisible, setPreviewVisible] = useState(() => loadSavedState('previewVisible', true));
+  const [previewVisible, setPreviewVisible] = useLocalStorage('previewVisible', true);
+
+  // TOC visibility
+  const [tocVisible, setTocVisible] = useLocalStorage('tocVisible', false);
+
+  // Last saved timestamp
+  const [lastSaved, setLastSaved] = useState(null);
 
   // Confirm dialog state
   const [confirmDialog, setConfirmDialog] = useState({
@@ -180,6 +155,10 @@ function App() {
     onConfirm: null,
     position: null
   });
+
+  // WebDAV state
+  const [showWebDAVSettings, setShowWebDAVSettings] = useState(false);
+  const { syncing, syncToWebDAV } = useWebDAVSync();
 
   // 处理编辑器滚动同步到预览区
   const handleEditorScroll = (scrollPercentage) => {
@@ -209,38 +188,11 @@ function App() {
   const [selectedSidebarEntry, setSelectedSidebarEntry] = useState(null);
   const [showNewMenu, setShowNewMenu] = useState(false);
   const newMenuRef = useRef(null);
-  const tagMenuRef = useRef(null);
   const [inlineCreate, setInlineCreate] = useState(null);
   const inlineCreateInputRef = useRef(null);
 
   // 文件搜索
   const [fileSearchQuery, setFileSearchQuery] = useState('');
-
-  // 标签系统
-  const [allTags, setAllTags] = useState(new Set()); // 所有标签集合
-  const [selectedTag, setSelectedTag] = useState(null); // 选中的标签过滤
-
-  // 保存状态到 localStorage（主题/设置/窗口管理已在 hooks 中处理）
-  useEffect(() => { saveState('currentFilePath', currentFilePath); }, [currentFilePath]);
-  useEffect(() => { saveState('previewMode', previewMode); }, [previewMode]);
-  useEffect(() => { saveState('previewVisible', previewVisible); }, [previewVisible]);
-  useEffect(() => { saveState('sidebarVisible', sidebarVisible); }, [sidebarVisible]);
-
-  useEffect(() => { saveState('currentFolder', currentFolder); }, [currentFolder]);
-  useEffect(() => { saveState('expandedFolders', Array.from(expandedFolders)); }, [expandedFolders]);
-
-  // 定义 loadFolderContents 函数需要在这里之前声明
-  // 恢复逻辑将在 loadFolderContents 定义之后添加
-
-  // 解析当前文件的标签
-  useEffect(() => {
-    if (currentFilePath && markdown) {
-      const tags = parseFrontmatterTags(markdown);
-      setCurrentTags(tags);
-    } else {
-      setCurrentTags([]);
-    }
-  }, [currentFilePath, markdown]);
 
   // PDF 自动缩放以适应窗口和拖动
   useEffect(() => {
@@ -305,6 +257,19 @@ function App() {
       window.removeEventListener('dragover', handleDragOver);
     };
   }, [addRecentFile]);
+
+  // 窗口关闭前的未保存警告
+  useEffect(() => {
+    const handleBeforeUnload = async (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // 显示指示器并设置自动隐藏
   const showPreviewIndicator = () => {
@@ -430,18 +395,19 @@ function App() {
   }, [showNewMenu]);
 
   // 监听标签菜单的外部点击关闭
+  // 点击外部关闭标签菜单
   useEffect(() => {
-    if (!showTagMenu) return;
+    if (!tagMenuOpen) return;
 
     const handleClickOutside = (e) => {
-      if (tagMenuRef.current && !tagMenuRef.current.contains(e.target)) {
-        setShowTagMenu(false);
+      if (!e.target.closest('.tag-menu')) {
+        setTagMenuOpen(null);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showTagMenu]);
+  }, [tagMenuOpen]);
 
   // 当切换根目录时重置选择和菜单状态
   useEffect(() => {
@@ -524,36 +490,49 @@ function App() {
   // 键盘快捷键处理
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // 如果正在输入新建名称，不处理快捷键
       if (inlineCreate) return;
 
-      // 检测 Mac 的 Cmd 键或 Windows/Linux 的 Ctrl 键
       const isMac = navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
       const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
 
       if (cmdOrCtrl) {
-        switch (e.key.toLowerCase()) {
-          case 'n':
-            e.preventDefault();
-            handleNew({ fromHotkey: true });
-            break;
-          case 'o':
-            e.preventDefault();
-            handleOpen();
-            break;
-          case 's':
-            e.preventDefault();
-            handleSave();
-            break;
-          default:
-            break;
+        const key = e.key.toLowerCase();
+        const withShift = e.shiftKey;
+
+        if (key === 'n' && !withShift) {
+          e.preventDefault();
+          handleNew({ fromHotkey: true });
+        } else if (key === 'o' && !withShift) {
+          e.preventDefault();
+          handleOpen();
+        } else if (key === 's' && !withShift) {
+          e.preventDefault();
+          handleSave();
+        } else if (key === 's' && withShift) {
+          e.preventDefault();
+          handleSaveAs();
+        } else if (key === 'w' && !withShift) {
+          e.preventDefault();
+          handleCloseFile();
+        } else if (key === 'b' && !withShift) {
+          e.preventDefault();
+          handleFormatText('bold');
+        } else if (key === 'i' && !withShift) {
+          e.preventDefault();
+          handleFormatText('italic');
+        } else if (key === 'u' && !withShift) {
+          e.preventDefault();
+          handleFormatText('strikethrough');
+        } else if (key === 'k' && !withShift) {
+          e.preventDefault();
+          handleFormatText('link');
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [hasUnsavedChanges, currentFilePath, markdown, inlineCreate]);
+  }, [hasUnsavedChanges, currentFilePath, markdown, inlineCreate, handleFormatText, handleCloseFile]);
 
   // 切换字体
   const handleFontChange = (index) => {
@@ -785,27 +764,19 @@ function App() {
     if (currentTags.includes(tag)) {
       setTagInput('');
       return;
-    }
-
-    const newTags = [...currentTags, tag];
-    const updatedContent = updateFrontmatterTags(markdown, newTags);
-    
-    setMarkdown(updatedContent);
-    setCurrentTags(newTags);
-    setTagInput('');
-    setHasUnsavedChanges(true);
-  };
-
-  const handleRemoveTag = async (tagToRemove) => {
-    if (!currentFilePath) return;
-    
-    const newTags = currentTags.filter(t => t !== tagToRemove);
-    const updatedContent = updateFrontmatterTags(markdown, newTags);
-    
-    setMarkdown(updatedContent);
-    setCurrentTags(newTags);
-    setHasUnsavedChanges(true);
-  };
+  // 彩色标签处理函数
+  const toggleFileTag = useCallback((filePath, colorName) => {
+    setFileTags(prev => {
+      const current = prev[filePath] || [];
+      const newTags = current.includes(colorName)
+        ? current.filter(c => c !== colorName)
+        : [...current, colorName];
+      
+      return newTags.length > 0 
+        ? { ...prev, [filePath]: newTags }
+        : Object.fromEntries(Object.entries(prev).filter(([k]) => k !== filePath));
+    });
+  }, []);
 
   // 切换文件夹展开/折叠
   const toggleFolder = useCallback(async (folderPath) => {
@@ -839,10 +810,31 @@ function App() {
       const entries = await readDir(folderPath);
       setFolderContents(sortEntries(entries));
       setExpandedFolders(new Set([folderPath]));
+      
+      // 并行扫描当前层级的 .md 文件标签
+      const scanCurrentLevel = async () => {
+        const mdFiles = entries.filter(item => !item.isDirectory && item.name.endsWith('.md'));
+        const results = await Promise.all(
+          mdFiles.map(async item => {
+            const fullPath = `${folderPath}/${item.name}`;
+            try {
+              const content = await readTextFile(fullPath);
+              const tags = parseTags(content);
+              return tags.length > 0 ? { fullPath, tags: tags.map(name => ({ name, color: getTagColor(name) })) } : null;
+            } catch (e) {
+              return null;
+            }
+          })
+        );
+        const tagMap = {};
+        results.forEach(r => r && (tagMap[r.fullPath] = r.tags));
+        setFileTags(prev => ({ ...prev, ...tagMap }));
+      };
+      scanCurrentLevel();
     } catch (error) {
       console.error('读取文件夹失败:', error);
     }
-  }, [sortEntries]);
+  }, [sortEntries, parseTags]);
 
   // 递归读取子文件夹内容
   const getSubfolderContents = useCallback(async (folderPath) => {
@@ -1069,12 +1061,20 @@ function App() {
       // 直接保存到当前文件
       await writeTextFile(filePath, markdown);
       setHasUnsavedChanges(false);
+      setLastSaved(new Date());
       addRecentFile(filePath);
+
+      // WebDAV 自动同步
+      const webdavConfig = localStorage.getItem('webdav_config');
+      if (webdavConfig) {
+        const filename = filePath.split('/').pop();
+        await syncToWebDAV(filename, markdown);
+      }
     } catch (error) {
       console.error('保存文件失败:', error);
       alert('❌ 保存失败: ' + error.message);
     }
-  }, [currentFilePath, markdown, addRecentFile]);
+  }, [currentFilePath, markdown, addRecentFile, syncToWebDAV]);
 
   // 另存为
   const handleSaveAs = async () => {
@@ -1099,6 +1099,80 @@ function App() {
       alert('❌ 保存失败: ' + error.message);
     }
   };
+
+  // 关闭当前文件
+  const handleCloseFile = useCallback(() => {
+    if (hasUnsavedChanges) {
+      const confirmed = confirm('当前文档有未保存的更改，确定要关闭吗？');
+      if (!confirmed) return;
+    }
+    setMarkdown('');
+    setCurrentFilePath(null);
+    setHasUnsavedChanges(false);
+  }, [hasUnsavedChanges]);
+
+  // 文本格式化
+  const handleFormatText = useCallback((format) => {
+    const textarea = editorAreaRef.current?.getTextareaElement();
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = markdown.substring(start, end);
+    const before = markdown.substring(0, start);
+    const after = markdown.substring(end);
+
+    let newText, newCursorPos;
+
+    switch (format) {
+      case 'bold':
+        if (selectedText) {
+          newText = `${before}**${selectedText}**${after}`;
+          newCursorPos = end + 4;
+        } else {
+          newText = `${before}****${after}`;
+          newCursorPos = start + 2;
+        }
+        break;
+      case 'italic':
+        if (selectedText) {
+          newText = `${before}*${selectedText}*${after}`;
+          newCursorPos = end + 2;
+        } else {
+          newText = `${before}**${after}`;
+          newCursorPos = start + 1;
+        }
+        break;
+      case 'strikethrough':
+        if (selectedText) {
+          newText = `${before}~~${selectedText}~~${after}`;
+          newCursorPos = end + 4;
+        } else {
+          newText = `${before}~~~~${after}`;
+          newCursorPos = start + 2;
+        }
+        break;
+      case 'link':
+        if (selectedText) {
+          newText = `${before}[${selectedText}](url)${after}`;
+          newCursorPos = end + 3;
+        } else {
+          newText = `${before}[text](url)${after}`;
+          newCursorPos = start + 1;
+        }
+        break;
+      default:
+        return;
+    }
+
+    setMarkdown(newText);
+    setHasUnsavedChanges(true);
+    
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    }, 0);
+  }, [markdown, editorAreaRef]);
 
   // 自动保存
   useAutoSave(markdown, currentFilePath, hasUnsavedChanges, autoSaveEnabled, handleSave);
@@ -1272,7 +1346,7 @@ function App() {
   // 使用 useMemo 缓存 markdown 渲染内容，避免主题切换时重新渲染
   const renderedMarkdown = useMemo(() => {
     // Pre-process markdown to convert Obsidian syntax to standard markdown
-    const processedMarkdown = markdown.replace(
+    const processedMarkdown = debouncedMarkdown.replace(
       /!\[\[([^\]]+\.(png|jpg|jpeg|gif|webp|svg|bmp|ico))\]\]/gi,
       (match, filename) => {
         // URL encode the entire path to handle spaces and special characters
@@ -1285,7 +1359,7 @@ function App() {
     );
 
     // Debug: show a sample of processedMarkdown
-    if (processedMarkdown !== markdown) {
+    if (processedMarkdown !== debouncedMarkdown) {
       const sample = processedMarkdown.substring(0, 500);
       console.log('📝 Processed markdown sample:', sample);
     }
@@ -1335,72 +1409,54 @@ function App() {
         {processedMarkdown}
       </ReactMarkdown>
     );
-  }, [markdown, currentFolder, currentFilePath, attachmentFolder]);
+  }, [debouncedMarkdown, currentFolder, currentFilePath, attachmentFolder]);
+
+  // Debounce markdown for preview
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedMarkdown(markdown), 300);
+    return () => clearTimeout(timer);
+  }, [markdown]);
 
   // 应用启动时恢复上次打开的文件和文件夹
   useEffect(() => {
     const restoreLastSession = async () => {
-      const savedFilePath = loadSavedState('currentFilePath', null);
-      const savedFolder = loadSavedState('currentFolder', null);
-      const savedExpandedFolders = loadSavedState('expandedFolders', []);
-      const savedSidebarVisible = loadSavedState('sidebarVisible', false);
-
       console.log('🔄 恢复会话:', {
-        savedFolder,
-        savedFilePath,
-        savedExpandedFolders,
-        savedSidebarVisible
+        currentFolder,
+        currentFilePath,
+        sidebarVisible
       });
 
-      // 如果有保存的文件夹，加载文件夹内容并显示侧边栏
-      if (savedFolder) {
+      // 如果有保存的文件夹，加载文件夹内容
+      if (currentFolder) {
         try {
-          // 确保侧边栏可见
-          if (savedSidebarVisible) {
-            setSidebarVisible(true);
-          }
-
-          // 先加载文件夹内容
-          await loadFolderContents(savedFolder);
+          await loadFolderContents(currentFolder);
           console.log('✅ 文件夹内容已加载');
-
-          // 然后恢复展开的文件夹状态
-          if (savedExpandedFolders && savedExpandedFolders.length > 0) {
-            console.log('📂 恢复展开的文件夹:', savedExpandedFolders);
-            // 使用 setTimeout 确保状态更新在下一个事件循环
-            setTimeout(() => {
-              setExpandedFolders(new Set(savedExpandedFolders));
-            }, 50);
-          }
         } catch (error) {
           console.error('❌ 无法恢复文件夹:', error);
-          saveState('currentFolder', null);
+          setCurrentFolder(null);
         }
       }
 
       // 如果有保存的文件，尝试加载
-      if (savedFilePath) {
+      if (currentFilePath) {
         try {
-          const content = await readTextFile(savedFilePath);
+          const content = await readTextFile(currentFilePath);
           setMarkdown(content);
           setHasUnsavedChanges(false);
-          console.log('✅ 成功恢复文件:', savedFilePath);
+          console.log('✅ 成功恢复文件:', currentFilePath);
         } catch (error) {
           console.error('❌ 无法恢复文件:', error);
-          // 文件不存在或无法读取，清除保存的路径
-          saveState('currentFilePath', null);
           setCurrentFilePath(null);
         }
       }
     };
 
-    // 延迟执行，确保组件完全挂载
     const timer = setTimeout(() => {
       restoreLastSession();
     }, 200);
 
     return () => clearTimeout(timer);
-  }, []); // 空依赖数组，只在组件挂载时运行一次
+  }, []);
 
   return (
     <div
@@ -1694,53 +1750,6 @@ function App() {
           {/* 右侧：功能按钮 */}
           <div className="w-40 flex items-center justify-end gap-2 relative">
 
-            {/* 标签管理按钮 */}
-            {currentFilePath && currentFilePath.endsWith('.md') && (
-              <div className="relative" ref={tagMenuRef}>
-                <button
-                  onClick={() => setShowTagMenu(!showTagMenu)}
-                  className="w-6 h-6 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800 transition-all active:scale-95"
-                  title="标签"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                </button>
-
-                {showTagMenu && (
-                  <div className="absolute right-0 top-8 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 p-2">
-                    <div className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-2 px-1">当前标签</div>
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {currentTags.length === 0 ? (
-                        <div className="text-[10px] text-gray-400 px-1">无标签</div>
-                      ) : (
-                        currentTags.map((tag, i) => (
-                          <span key={i} className="px-2 py-0.5 text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded flex items-center gap-1">
-                            {tag}
-                            <button onClick={() => handleRemoveTag(tag)} className="hover:text-red-600">×</button>
-                          </span>
-                        ))
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      placeholder="添加标签..."
-                      className="w-full px-2 py-1 text-[10px] border rounded bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-400"
-                      style={{ color: appTextColor, borderColor: 'rgba(0, 0, 0, 0.2)' }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddTag();
-                        }
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* 字体选择器 */}
             <div className="relative">
               <button
@@ -1896,6 +1905,45 @@ function App() {
               )}
             </div>
 
+            {/* WebDAV 同步按钮 */}
+            <div className="relative">
+              <button
+                onClick={() => setShowWebDAVSettings(true)}
+                disabled={syncing}
+                className="w-6 h-6 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800 transition-all active:scale-95 disabled:opacity-50"
+                title={syncing ? "Syncing..." : "WebDAV Sync"}
+              >
+                {syncing ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                  </svg>
+                )}
+              </button>
+              {syncing && (
+                <div className="absolute right-0 top-8 px-2 py-1 rounded bg-blue-50 dark:bg-blue-900/50 shadow-lg border border-blue-200 dark:border-blue-700 z-50">
+                  <div className="text-xs text-blue-600 dark:text-blue-300 whitespace-nowrap">
+                    Syncing...
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* TOC 切换按钮 */}
+            <button
+              onClick={() => setTocVisible(!tocVisible)}
+              className="w-6 h-6 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800 transition-all active:scale-95"
+              title={tocVisible ? '隐藏目录' : '显示目录'}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+              </svg>
+            </button>
+
             {/* Settings按钮 */}
             <button
               onClick={() => setShowSettingsDialog(true)}
@@ -2049,6 +2097,7 @@ function App() {
                       onInlineConfirm={confirmInlineCreate}
                       onInlineCancel={cancelInlineCreate}
                       onSelectEntry={handleSelectSidebarEntry}
+                      fileTags={fileTags}
                     />
                   ))}
                 </div>
@@ -2139,7 +2188,17 @@ function App() {
 
             {previewMode === 'markdown' ? (
               /* Markdown 预览模式 - 正常网页效果 */
-              <div className="w-full max-w-4xl p-6">
+              <div className="w-full max-w-4xl p-6 flex gap-6">
+                {/* TOC 组件 */}
+                {tocVisible && (
+                  <TableOfContents
+                    markdown={markdown}
+                    onHeadingClick={(id) => {
+                      const element = document.getElementById(id);
+                      if (element) element.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                  />
+                )}
                 <article
                   className="prose max-w-none prose-headings:font-semibold"
                   style={{
@@ -2559,6 +2618,11 @@ function App() {
       }}>
         {chars} 字符 · {words} 单词 · {lines} 行
       </div>
+
+      {/* WebDAV Settings Dialog */}
+      {showWebDAVSettings && (
+        <WebDAVSettings onClose={() => setShowWebDAVSettings(false)} />
+      )}
     </div>
   );
 }

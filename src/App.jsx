@@ -2033,7 +2033,6 @@ function App() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
-                </div>
 
                 {/* 文件搜索框 */}
                 <div className="px-2 py-2 border-b" style={{ borderBottomColor: 'rgba(0, 0, 0, 0.1)' }}>
@@ -2101,7 +2100,6 @@ function App() {
                     />
                   ))}
                 </div>
-              </div>
 
               {/* 侧边栏拖动条 */}
               <div
@@ -2109,7 +2107,6 @@ function App() {
                 onMouseDown={() => setIsDraggingSidebar(true)}
               >
                 <div className="absolute inset-y-0 -left-2 -right-2" />
-              </div>
             </>
           )}
 
@@ -2139,7 +2136,6 @@ function App() {
             onMouseDown={() => setIsDraggingEditor(true)}
           >
             <div className="absolute inset-y-0 -left-2 -right-2" />
-          </div>
         )}
 
         {/* 右侧：预览区 */}
@@ -2531,8 +2527,6 @@ function App() {
                   <article>
                     {renderedMarkdown}
                   </article>
-                </div>
-              </div>
             )}
           </section>
         )}
