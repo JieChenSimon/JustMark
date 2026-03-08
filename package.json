@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "clean:tauri-bundle": "node scripts/clean-tauri-bundle.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },
