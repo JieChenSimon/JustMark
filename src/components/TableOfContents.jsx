@@ -18,26 +18,27 @@ const TableOfContents = memo(({ markdown, onHeadingClick }) => {
     return result;
   }, [markdown]);
 
-  if (headings.length === 0) return null;
+  if (headings.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-xs">
+        当前文档无标题
+      </div>
+    );
+  }
 
   return (
-    <div className="h-full overflow-y-auto bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 p-4">
-      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">目录</h3>
-      <nav className="space-y-1">
-        {headings.map((heading, idx) => (
-          <button
-            key={idx}
-            onClick={() => onHeadingClick(heading.line)}
-            className="block w-full text-left text-sm hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            style={{ paddingLeft: `${(heading.level - 1) * 12}px` }}
-          >
-            <span className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400">
-              {heading.text}
-            </span>
-          </button>
-        ))}
-      </nav>
-    </div>
+    <nav className="space-y-0.5">
+      {headings.map((heading, idx) => (
+        <button
+          key={idx}
+          onClick={() => onHeadingClick(heading.line)}
+          className="block w-full text-left text-[11px] py-1 px-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+          style={{ paddingLeft: `${8 + (heading.level - 1) * 12}px` }}
+        >
+          {heading.text}
+        </button>
+      ))}
+    </nav>
   );
 });
 

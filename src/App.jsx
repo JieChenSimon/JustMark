@@ -11,8 +11,9 @@ import { save, open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile, writeFile, readTextFile, readDir, remove, mkdir, rename } from '@tauri-apps/plugin-fs';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { revealItemInDir } from '@tauri-apps/plugin-opener';
+import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { useWebClipper } from './hooks/useWebClipper';
+import { hasWebDAVClient, initWebDAV } from './utils/webdav';
 import { useTheme } from './hooks/useTheme';
 import { useSettings } from './hooks/useSettings';
 import { useWindowManager } from './hooks/useWindowManager';
@@ -47,25 +48,17 @@ const getTagColor = (tagName) => {
   return TAG_COLORS[hash % TAG_COLORS.length].color;
 };
 
+const EDITABLE_FILE_EXTENSIONS = new Set(['md', 'markdown', 'txt']);
+
+const getFileExtension = (filePath = '') => {
+  const fileName = filePath.split('/').pop() || '';
+  const lastDotIndex = fileName.lastIndexOf('.');
+  return lastDotIndex >= 0 ? fileName.slice(lastDotIndex + 1).toLowerCase() : '';
+};
+
+const isEditableFile = (filePath) => EDITABLE_FILE_EXTENSIONS.has(getFileExtension(filePath));
+
 function App() {
-  // 调试：检查 Tauri 环境
-  useEffect(() => {
-    console.log('🔍 JustMark 调试信息:');
-    console.log('  - 是否在 Tauri 环境:', window.__TAURI__ !== undefined);
-    console.log('  - User Agent:', navigator.userAgent);
-    console.log('  - Platform:', navigator.platform);
-
-    // 测试拖动区域
-    const header = document.querySelector('header[data-tauri-drag-region]');
-    if (header) {
-      const style = window.getComputedStyle(header);
-      console.log('  - Header 拖动样式:', {
-        webkitAppRegion: style.webkitAppRegion || style['-webkit-app-region'],
-        appRegion: style.appRegion
-      });
-    }
-  }, []);
-
   const [markdown, setMarkdown] = useState("### JustMark\n Write in a single way...");
   const [debouncedMarkdown, setDebouncedMarkdown] = useState(markdown);
   const markdownRef = useRef(markdown);
@@ -115,9 +108,8 @@ function App() {
   const [currentFilePath, setCurrentFilePath] = useLocalStorage('currentFilePath', null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showOpenMenu, setShowOpenMenu] = useState(false);
-  const [showTagMenu, setShowTagMenu] = useState(false);
   const [fileTags, setFileTags] = useLocalStorage('justmark_file_tags', {});
-  const [tagMenuOpen, setTagMenuOpen] = useState(null);
+  const [webdavConfig, setWebdavConfig] = useLocalStorage('webdav_config', null);
   
   const [previewMode, setPreviewMode] = useLocalStorage('previewMode', 'markdown');
   const [showIndicator, setShowIndicator] = useState(true);
@@ -142,8 +134,8 @@ function App() {
   // Preview panel visibility
   const [previewVisible, setPreviewVisible] = useLocalStorage('previewVisible', true);
 
-  // TOC visibility
-  const [tocVisible, setTocVisible] = useLocalStorage('tocVisible', false);
+  // Sidebar mode: 'files' or 'toc'
+  const [sidebarMode, setSidebarMode] = useLocalStorage('sidebarMode', 'files');
 
   // Last saved timestamp
   const [lastSaved, setLastSaved] = useState(null);
@@ -195,8 +187,6 @@ function App() {
   // 文件搜索
   const [fileSearchQuery, setFileSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState(null);
-  const [tagInput, setTagInput] = useState('');
-  const [currentTags, setCurrentTags] = useState([]);
 
   // PDF 自动缩放以适应窗口和拖动
   useEffect(() => {
@@ -231,36 +221,28 @@ function App() {
     };
   }, [previewMode]);
 
-  // 文件拖拽打开
-  useEffect(() => {
-    const handleDrop = async (e) => {
-      e.preventDefault();
-      const file = e.dataTransfer.files[0];
-      if (!file) return;
-      
-      if (file.name.endsWith('.md')) {
-        const content = await readTextFile(file.path);
-        setMarkdown(content);
-        setCurrentFilePath(file.path);
-        setHasUnsavedChanges(false);
-        addRecentFile(file.path);
-      } else if (file.type === '') {
-        // 可能是文件夹
-        setCurrentFolder(file.path);
-        await loadFolderContents(file.path);
-      }
-    };
-    
-    const handleDragOver = (e) => e.preventDefault();
-    
-    window.addEventListener('drop', handleDrop);
-    window.addEventListener('dragover', handleDragOver);
-    
-    return () => {
-      window.removeEventListener('drop', handleDrop);
-      window.removeEventListener('dragover', handleDragOver);
-    };
+  const openFileInEditor = useCallback(async (filePath) => {
+    const content = await readTextFile(filePath);
+    setMarkdown(content);
+    setCurrentFilePath(filePath);
+    setHasUnsavedChanges(false);
+    setSelectedSidebarEntry({ path: filePath, isDirectory: false });
+    addRecentFile(filePath);
   }, [addRecentFile]);
+
+  const openFileWithFallback = useCallback(async (filePath) => {
+    if (isEditableFile(filePath)) {
+      await openFileInEditor(filePath);
+      return;
+    }
+
+    try {
+      await openPath(filePath);
+    } catch (error) {
+      console.error('打开非 Markdown 文件失败:', error);
+      alert('❌ 该文件类型无法在 JustMark 中编辑，且无法调用系统默认应用打开: ' + (error?.message || error));
+    }
+  }, [openFileInEditor]);
 
   // 保持 markdownRef 始终指向最新内容，供稳定回调读取
   useEffect(() => {
@@ -402,21 +384,6 @@ function App() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showNewMenu]);
-
-  // 监听标签菜单的外部点击关闭
-  // 点击外部关闭标签菜单
-  useEffect(() => {
-    if (!tagMenuOpen) return;
-
-    const handleClickOutside = (e) => {
-      if (!e.target.closest('.tag-menu')) {
-        setTagMenuOpen(null);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [tagMenuOpen]);
 
   // 当切换根目录时重置选择和菜单状态
   useEffect(() => {
@@ -728,6 +695,16 @@ function App() {
     setShowNewMenu(prev => !prev);
   };
 
+  const toggleSidebarToc = useCallback(() => {
+    if (sidebarVisible && sidebarMode === 'toc') {
+      setSidebarVisible(false);
+      return;
+    }
+
+    setSidebarVisible(true);
+    setSidebarMode('toc');
+  }, [sidebarMode, sidebarVisible]);
+
   // 打开文件或文件夹按钮点击
   const handleOpen = () => {
     setShowOpenMenu(!showOpenMenu);
@@ -748,11 +725,7 @@ function App() {
 
       if (!selected) return;
 
-      const content = await readTextFile(selected);
-      setMarkdown(content);
-      setCurrentFilePath(selected);
-      setHasUnsavedChanges(false);
-      setSelectedSidebarEntry({ path: selected, isDirectory: false });
+      await openFileInEditor(selected);
 
       // 提取文件夹路径并加载文件夹内容（但不自动显示侧边栏）
       const folderPath = selected.substring(0, selected.lastIndexOf('/'));
@@ -779,17 +752,6 @@ function App() {
     } catch (error) {
       console.error('打开文件夹失败:', error);
       alert('❌ 打开文件夹失败: ' + error.message);
-    }
-  };
-
-  // 标签管理
-  const handleAddTag = async () => {
-    const tag = tagInput.trim();
-    if (!tag || !currentFilePath) return;
-    
-    if (currentTags.includes(tag)) {
-      setTagInput('');
-      return;
     }
   };
 
@@ -888,6 +850,35 @@ function App() {
     }
   }, [sortEntries]);
 
+  // 文件拖拽打开
+  useEffect(() => {
+    const handleDrop = async (e) => {
+      e.preventDefault();
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+
+      if (isEditableFile(file.path)) {
+        await openFileInEditor(file.path);
+      } else if (file.type === '') {
+        // 可能是文件夹
+        setCurrentFolder(file.path);
+        await loadFolderContents(file.path);
+      } else {
+        await openFileWithFallback(file.path);
+      }
+    };
+
+    const handleDragOver = (e) => e.preventDefault();
+
+    window.addEventListener('drop', handleDrop);
+    window.addEventListener('dragover', handleDragOver);
+
+    return () => {
+      window.removeEventListener('drop', handleDrop);
+      window.removeEventListener('dragover', handleDragOver);
+    };
+  }, [loadFolderContents, openFileInEditor, openFileWithFallback]);
+
   // 过滤文件列表
   const filteredFolderContents = useMemo(() => {
     if (!fileSearchQuery.trim() && !selectedTag) return folderContents;
@@ -917,20 +908,13 @@ function App() {
 
   // 从侧边栏打开文件
   const handleOpenFileFromSidebar = useCallback(async (filePath) => {
-    console.log('尝试打开文件:', filePath);
     try {
-      const content = await readTextFile(filePath);
-      console.log('文件读取成功，内容长度:', content.length);
-      setMarkdown(content);
-      setCurrentFilePath(filePath);
-      setHasUnsavedChanges(false);
-      setSelectedSidebarEntry({ path: filePath, isDirectory: false });
-      addRecentFile(filePath);
+      await openFileWithFallback(filePath);
     } catch (error) {
       console.error('打开文件失败:', error);
       alert('❌ 打开文件失败: ' + error.message);
     }
-  }, [addRecentFile]);
+  }, [openFileWithFallback]);
 
   // 刷新文件夹内容
   const refreshFolderContents = async (folderPath) => {
@@ -1452,10 +1436,14 @@ function App() {
 
       // 如果有保存的文件，尝试加载
       if (currentFilePath) {
+        if (!isEditableFile(currentFilePath)) {
+          console.warn('⚠️ 跳过恢复非可编辑文件:', currentFilePath);
+          setCurrentFilePath(null);
+          return;
+        }
+
         try {
-          const content = await readTextFile(currentFilePath);
-          setMarkdown(content);
-          setHasUnsavedChanges(false);
+          await openFileInEditor(currentFilePath);
           console.log('✅ 成功恢复文件:', currentFilePath);
         } catch (error) {
           console.error('❌ 无法恢复文件:', error);
@@ -1946,11 +1934,11 @@ function App() {
               )}
             </div>
 
-            {/* TOC 切换按钮 */}
+            {/* TOC 按钮 */}
             <button
-              onClick={() => setTocVisible(!tocVisible)}
+              onClick={toggleSidebarToc}
               className="w-6 h-6 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800 transition-all active:scale-95"
-              title={tocVisible ? '隐藏目录' : '显示目录'}
+              title={sidebarVisible && sidebarMode === 'toc' ? '隐藏目录' : '显示目录'}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
@@ -2011,7 +1999,7 @@ function App() {
           }}
         >
           {/* 侧边栏 - macOS 风格 */}
-          {sidebarVisible && currentFolder && (
+          {sidebarVisible && (currentFolder || sidebarMode === 'toc') && (
             <>
               <div
                 className="backdrop-blur-xl border-r flex flex-col"
@@ -2021,7 +2009,7 @@ function App() {
                   borderRightColor: 'rgba(0, 0, 0, 0.1)'
                 }}
               >
-                {/* 文件浏览器头部 */}
+                {/* 侧边栏头部 */}
                 <div
                   className="h-10 px-3 flex items-center justify-between border-b flex-shrink-0"
                   style={{
@@ -2030,11 +2018,27 @@ function App() {
                   }}
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {/* 切换按钮 */}
+                    <button
+                      onClick={() => setSidebarMode(sidebarMode === 'files' ? 'toc' : 'files')}
+                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200/70 dark:hover:bg-gray-700/70 transition-all active:scale-95"
+                      title={sidebarMode === 'files' ? '切换到目录' : '切换到文件'}
+                    >
+                      {sidebarMode === 'files' ? (
+                        <svg className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                        </svg>
+                      ) : (
+                        <svg className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                      )}
+                    </button>
                     <span
                       className="text-[11px] font-semibold truncate"
                       style={{ color: appTextColor }}
                     >
-                      {currentFolder.split('/').pop() || 'Files'}
+                      {sidebarMode === 'files' ? (currentFolder?.split('/').pop() || 'Files') : '目录'}
                     </span>
                   </div>
                   <button
@@ -2048,72 +2052,88 @@ function App() {
                   </button>
                 </div>
 
-                {/* 文件搜索框 */}
-                <div className="px-2 py-2 border-b" style={{ borderBottomColor: 'rgba(0, 0, 0, 0.1)' }}>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={fileSearchQuery}
-                      onChange={(e) => setFileSearchQuery(e.target.value)}
-                      placeholder="Search files..."
-                      className="w-full px-2 py-1 text-[11px] rounded border bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-400"
-                      style={{
-                        color: appTextColor,
-                        borderColor: 'rgba(0, 0, 0, 0.2)'
+                {sidebarMode === 'files' ? (
+                  <>
+                    {/* 文件搜索框 */}
+                    <div className="px-2 py-2 border-b" style={{ borderBottomColor: 'rgba(0, 0, 0, 0.1)' }}>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={fileSearchQuery}
+                          onChange={(e) => setFileSearchQuery(e.target.value)}
+                          placeholder="Search files..."
+                          className="w-full px-2 py-1 text-[11px] rounded border bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-400"
+                          style={{
+                            color: appTextColor,
+                            borderColor: 'rgba(0, 0, 0, 0.2)'
+                          }}
+                        />
+                        {fileSearchQuery && (
+                          <button
+                            onClick={() => setFileSearchQuery('')}
+                            className="absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center rounded hover:bg-gray-200/70 dark:hover:bg-gray-700/70"
+                          >
+                            <svg className="w-2.5 h-2.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 文件树列表 */}
+                    <div className="flex-1 overflow-y-auto overflow-x-hidden py-1 custom-scrollbar">
+                      {inlineCreate && inlineCreate.parentPath === currentFolder && (
+                        <InlineCreateRow
+                          level={0}
+                          type={inlineCreate.type}
+                          value={inlineCreate.value}
+                          inputRef={inlineCreateInputRef}
+                          onChange={handleInlineNameChange}
+                          onConfirm={confirmInlineCreate}
+                          onCancel={cancelInlineCreate}
+                        />
+                      )}
+                      {filteredFolderContents.map((entry, index) => (
+                        <FileTreeItem
+                          key={index}
+                          entry={entry}
+                          basePath={currentFolder}
+                          level={0}
+                          currentFilePath={currentFilePath}
+                          expandedFolders={expandedFolders}
+                          folderRefreshTimestamps={folderRefreshTimestamps}
+                          onToggleFolder={toggleFolder}
+                          onOpenFile={handleOpenFileFromSidebar}
+                          getSubfolderContents={getSubfolderContents}
+                          onStartInlineCreate={startCreateEntryFromContext}
+                          onDeleteEntry={handleDeleteFile}
+                          onRenameEntry={handleRenameEntry}
+                          onRevealInFinder={handleRevealInFinder}
+                          inlineCreate={inlineCreate}
+                          inlineInputRef={inlineCreateInputRef}
+                          onInlineChange={handleInlineNameChange}
+                          onInlineConfirm={confirmInlineCreate}
+                          onInlineCancel={cancelInlineCreate}
+                          onSelectEntry={handleSelectSidebarEntry}
+                          fileTags={fileTags}
+                        />
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  /* TOC 模式 */
+                  <div className="flex-1 overflow-y-auto px-3 py-3 custom-scrollbar">
+                    <TableOfContents
+                      markdown={markdown}
+                      onHeadingClick={(lineNumber) => {
+                        if (editorAreaRef.current?.scrollToLine) {
+                          editorAreaRef.current.scrollToLine(lineNumber);
+                        }
                       }}
                     />
-                    {fileSearchQuery && (
-                      <button
-                        onClick={() => setFileSearchQuery('')}
-                        className="absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center rounded hover:bg-gray-200/70 dark:hover:bg-gray-700/70"
-                      >
-                        <svg className="w-2.5 h-2.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
                   </div>
-                </div>
-
-                {/* 文件树列表 */}
-                <div className="flex-1 overflow-y-auto overflow-x-hidden py-1 custom-scrollbar">
-                  {inlineCreate && inlineCreate.parentPath === currentFolder && (
-                    <InlineCreateRow
-                      level={0}
-                      type={inlineCreate.type}
-                      value={inlineCreate.value}
-                      inputRef={inlineCreateInputRef}
-                      onChange={handleInlineNameChange}
-                      onConfirm={confirmInlineCreate}
-                      onCancel={cancelInlineCreate}
-                    />
-                  )}
-                  {filteredFolderContents.map((entry, index) => (
-                    <FileTreeItem
-                      key={index}
-                      entry={entry}
-                      basePath={currentFolder}
-                      level={0}
-                      currentFilePath={currentFilePath}
-                      expandedFolders={expandedFolders}
-                      folderRefreshTimestamps={folderRefreshTimestamps}
-                      onToggleFolder={toggleFolder}
-                      onOpenFile={handleOpenFileFromSidebar}
-                      getSubfolderContents={getSubfolderContents}
-                      onStartInlineCreate={startCreateEntryFromContext}
-                      onDeleteEntry={handleDeleteFile}
-                      onRenameEntry={handleRenameEntry}
-                      onRevealInFinder={handleRevealInFinder}
-                      inlineCreate={inlineCreate}
-                      inlineInputRef={inlineCreateInputRef}
-                      onInlineChange={handleInlineNameChange}
-                      onInlineConfirm={confirmInlineCreate}
-                      onInlineCancel={cancelInlineCreate}
-                      onSelectEntry={handleSelectSidebarEntry}
-                      fileTags={fileTags}
-                    />
-                  ))}
-                </div>
+                )}
               </div>
 
               {/* 侧边栏拖动条 */}
@@ -2201,17 +2221,7 @@ function App() {
 
             {previewMode === 'markdown' ? (
               /* Markdown 预览模式 - 正常网页效果 */
-              <div className="w-full max-w-4xl p-6 flex gap-6">
-                {/* TOC 组件 */}
-                {tocVisible && (
-                  <TableOfContents
-                    markdown={markdown}
-                    onHeadingClick={(id) => {
-                      const element = document.getElementById(id);
-                      if (element) element.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                  />
-                )}
+              <div className="w-full max-w-4xl p-6">
                 <article
                   className="prose max-w-none prose-headings:font-semibold"
                   style={{

@@ -14,6 +14,8 @@ export const initWebDAV = (url, username, password) => {
   }
 };
 
+export const hasWebDAVClient = () => client !== null;
+
 export const uploadFile = async (localPath, remotePath, content) => {
   if (!client) throw new Error('WebDAV not initialized');
   await client.putFileContents(remotePath, content);
@@ -36,5 +38,5 @@ export const deleteFile = async (remotePath) => {
 
 export const createDirectory = async (remotePath) => {
   if (!client) throw new Error('WebDAV not initialized');
-  await client.createDirectory(remotePath);
+  await client.createDirectory(remotePath, { recursive: true });
 };

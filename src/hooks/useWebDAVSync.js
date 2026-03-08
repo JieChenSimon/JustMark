@@ -1,14 +1,22 @@
-import { useState, useEffect } from 'react';
-import { uploadFile, downloadFile, listFiles } from '../utils/webdav';
+import { useState } from 'react';
+import { createDirectory, downloadFile, uploadFile } from '../utils/webdav';
 
 export default function useWebDAVSync() {
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(null);
 
-  const syncToWebDAV = async (filename, content) => {
+  const syncToWebDAV = async (remotePath, content) => {
     setSyncing(true);
     try {
-      await uploadFile(null, `/JustMark/${filename}`, content);
+      const normalizedPath = remotePath.startsWith('/') ? remotePath : `/${remotePath}`;
+      const lastSlashIndex = normalizedPath.lastIndexOf('/');
+      const directoryPath = lastSlashIndex > 0 ? normalizedPath.substring(0, lastSlashIndex) : '/';
+
+      if (directoryPath && directoryPath !== '/') {
+        await createDirectory(directoryPath);
+      }
+
+      await uploadFile(null, normalizedPath, content);
       setLastSync(new Date());
       return { success: true };
     } catch (error) {
@@ -18,10 +26,11 @@ export default function useWebDAVSync() {
     }
   };
 
-  const syncFromWebDAV = async (filename) => {
+  const syncFromWebDAV = async (remotePath) => {
     setSyncing(true);
     try {
-      const content = await downloadFile(`/JustMark/${filename}`);
+      const normalizedPath = remotePath.startsWith('/') ? remotePath : `/${remotePath}`;
+      const content = await downloadFile(normalizedPath);
       setLastSync(new Date());
       return { success: true, content };
     } catch (error) {

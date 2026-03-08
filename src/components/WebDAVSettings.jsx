@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import { initWebDAV } from '../utils/webdav';
 
-export default function WebDAVSettings({ onClose }) {
-  const [url, setUrl] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+export default function WebDAVSettings({ initialConfig, onClose, onSave }) {
+  const [url, setUrl] = useState(initialConfig?.url || '');
+  const [username, setUsername] = useState(initialConfig?.username || '');
+  const [password, setPassword] = useState(initialConfig?.password || '');
   const [status, setStatus] = useState('');
 
   const handleConnect = async () => {
     const result = initWebDAV(url, username, password);
     if (result.success) {
+      const config = { url, username, password };
       setStatus('✅ 连接成功');
-      localStorage.setItem('webdav_config', JSON.stringify({ url, username }));
+      localStorage.setItem('webdav_config', JSON.stringify(config));
+      onSave?.(config);
       setTimeout(onClose, 1000);
     } else {
       setStatus('❌ 连接失败: ' + result.error);

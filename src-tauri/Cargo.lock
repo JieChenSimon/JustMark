@@ -1949,7 +1949,7 @@ dependencies = [
 
 [[package]]
 name = "justmark"
-version = "0.0.9"
+version = "0.1.1"
 dependencies = [
  "base64 0.21.7",
  "encoding_rs",
