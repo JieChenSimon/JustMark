@@ -26,34 +26,6 @@ const SearchReplace = forwardRef(function SearchReplace({
     }
   }, [isOpen]);
 
-  useImperativeHandle(ref, () => ({
-    open: (mode = 'find') => {
-      setReplaceVisible(mode === 'replace');
-      requestAnimationFrame(() => {
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
-      });
-    },
-    close: () => {
-      setReplaceVisible(false);
-      onClose();
-    },
-    findNext: () => {
-      setReplaceVisible(false);
-      handleNext();
-    },
-    findPrevious: () => {
-      setReplaceVisible(false);
-      handlePrevious();
-    },
-    focusReplace: () => {
-      setReplaceVisible(true);
-      requestAnimationFrame(() => {
-        searchInputRef.current?.focus();
-      });
-    }
-  }));
-
   const totalMatches = useMemo(() => {
     if (!searchTerm) {
       return 0;
@@ -81,17 +53,15 @@ const SearchReplace = forwardRef(function SearchReplace({
     while ((match = regex.exec(text)) !== null) {
       count++;
       if (count === matchIndex) {
-        // 设置光标位置并选中匹配的文本
         textareaRef.current.focus();
         textareaRef.current.setSelectionRange(match.index, match.index + match[0].length);
 
-        // 滚动到可见区域
         const textarea = textareaRef.current;
         const textBeforeCursor = text.substring(0, match.index);
         const lines = textBeforeCursor.split('\n');
         const lineNumber = lines.length;
-        const lineHeight = 24; // 根据你的字体大小调整
-        const scrollPosition = (lineNumber - 5) * lineHeight; // 留出一些上下文
+        const lineHeight = 24;
+        const scrollPosition = (lineNumber - 5) * lineHeight;
         textarea.scrollTop = Math.max(0, scrollPosition);
 
         break;
@@ -114,6 +84,34 @@ const SearchReplace = forwardRef(function SearchReplace({
     setCurrentMatch(newIndex);
     jumpToMatch(newIndex);
   };
+
+  useImperativeHandle(ref, () => ({
+    open: (mode = 'find') => {
+      setReplaceVisible(mode === 'replace');
+      requestAnimationFrame(() => {
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      });
+    },
+    close: () => {
+      setReplaceVisible(false);
+      onClose();
+    },
+    findNext: () => {
+      setReplaceVisible(false);
+      handleNext();
+    },
+    findPrevious: () => {
+      setReplaceVisible(false);
+      handlePrevious();
+    },
+    focusReplace: () => {
+      setReplaceVisible(true);
+      requestAnimationFrame(() => {
+        searchInputRef.current?.focus();
+      });
+    }
+  }));
 
   // 替换当前匹配项
   const handleReplace = () => {

@@ -26,6 +26,7 @@ export default [
                 DOMParser: 'readonly',
                 Event: 'readonly',
                 InputEvent: 'readonly',
+                CustomEvent: 'readonly',
                 Element: 'readonly',
                 requestAnimationFrame: 'readonly',
                 cancelAnimationFrame: 'readonly',

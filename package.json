@@ -18,7 +18,7 @@
     "@tauri-apps/plugin-opener": "^2",
     "docx": "^9.6.0",
     "html2canvas": "^1.4.1",
-    "jspdf": "^3.0.4",
+    "jspdf": "^4.2.0",
     "katex": "^0.16.25",
     "mermaid": "^11.12.3",
     "png-to-ico": "^3.0.1",
