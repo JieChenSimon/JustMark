@@ -1,22 +1,14 @@
 import { useState, useEffect } from 'react';
+import { loadSavedState, saveState, subscribeToStoredState } from '../utils/storage';
 
 export function useLocalStorage(key, defaultValue) {
-  const [value, setValue] = useState(() => {
-    try {
-      const saved = localStorage.getItem(key);
-      return saved !== null ? JSON.parse(saved) : defaultValue;
-    } catch {
-      return defaultValue;
-    }
-  });
+  const [value, setValue] = useState(() => loadSavedState(key, defaultValue));
 
   useEffect(() => {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (error) {
-      console.error(`保存状态失败 (${key}):`, error);
-    }
+    saveState(key, value);
   }, [key, value]);
+
+  useEffect(() => subscribeToStoredState(key, setValue), [key]);
 
   return [value, setValue];
 }

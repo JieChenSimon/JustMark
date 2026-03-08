@@ -10,10 +10,14 @@ export default function ConfirmDialog({
   cancelText = 'Cancel',
   onConfirm,
   onCancel,
+  onSecondary,
   isDangerous = false,
-  position = null
+  position = null,
+  hideCancel = false,
+  secondaryText = null
 }) {
   if (!isOpen) return null;
+  const isSheet = position === null;
 
   // 计算对话框位置
   const getDialogPosition = () => {
@@ -52,38 +56,50 @@ export default function ConfirmDialog({
     <div className="fixed inset-0 z-50 pointer-events-none">
       {/* Transparent overlay to capture clicks outside */}
       <div
-        className="absolute inset-0 pointer-events-auto"
+        className={`absolute inset-0 pointer-events-auto ${isSheet ? 'bg-transparent' : 'bg-[rgba(236,240,244,0.22)] backdrop-blur-[10px]'}`}
         onClick={onCancel}
       />
 
       {/* Dialog */}
       <div
-        className="relative bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-lg shadow-xl border border-gray-200/50 dark:border-gray-700/50 p-3 w-[200px] animate-scale-in pointer-events-auto"
-        style={position ? getDialogPosition() : {}}
+        className={`pointer-events-auto ${isSheet
+          ? 'absolute left-1/2 top-5 w-[420px] -translate-x-1/2 rounded-b-[18px] border border-t-0 border-slate-200/80 bg-white/96 p-4 shadow-[0_14px_34px_rgba(15,23,42,0.16)]'
+          : 'relative w-[240px] rounded-[20px] border border-slate-200/70 bg-white/88 p-4 shadow-[0_24px_60px_rgba(15,23,42,0.18)] backdrop-blur-2xl dark:border-slate-700/70 dark:bg-slate-900/88 animate-scale-in'}`}
+        style={position ? getDialogPosition() : undefined}
       >
         {/* Title */}
-        <h3 className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 mb-1">
+        <h3 className="mb-1.5 text-[13px] font-semibold text-slate-900 dark:text-slate-100">
           {title}
         </h3>
 
         {/* Message */}
-        <p className="text-[10px] text-gray-600 dark:text-gray-400 mb-2.5 leading-snug">
+        <p className="mb-4 text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">
           {message}
         </p>
 
         {/* Actions */}
-        <div className="flex gap-1.5 justify-end">
-          <button
-            onClick={onCancel}
-            className="px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-          >
-            {cancelText}
-          </button>
+        <div className={`flex gap-2 ${isSheet ? 'justify-start' : 'justify-end'}`}>
+          {!hideCancel && (
+            <button
+              onClick={onCancel}
+              className="jm-button px-3 py-1.5 text-[11px] text-slate-600 dark:text-gray-300"
+            >
+              {cancelText}
+            </button>
+          )}
+          {secondaryText && onSecondary && (
+            <button
+              onClick={onSecondary}
+              className="jm-button px-3 py-1.5 text-[11px] text-slate-600 dark:text-gray-300"
+            >
+              {secondaryText}
+            </button>
+          )}
           <button
             onClick={onConfirm}
-            className={`px-2 py-0.5 text-[10px] font-medium text-white rounded shadow-sm transition-colors ${isDangerous
-                ? 'bg-red-500 hover:bg-red-600'
-                : 'bg-blue-500 hover:bg-blue-600'
+            className={`jm-button px-3 py-1.5 text-[11px] font-semibold text-white ${isDangerous
+                ? 'bg-gradient-to-b from-red-400 to-red-500 hover:from-red-500 hover:to-red-600'
+                : 'jm-button-accent'
               }`}
           >
             {confirmText}

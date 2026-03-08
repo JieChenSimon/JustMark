@@ -4,12 +4,12 @@ const loadSavedState = (key, defaultValue) => {
     try {
         const saved = localStorage.getItem(key);
         if (saved !== null) return JSON.parse(saved);
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
     return defaultValue;
 };
 
 const saveState = (key, value) => {
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* ignore */ }
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
 };
 
 /**

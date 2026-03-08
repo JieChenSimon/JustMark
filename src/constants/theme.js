@@ -2,8 +2,8 @@
 // 🛠️ 核心配置常量
 // ==============================================
 
-// 头部高度
-export const HEADER_HEIGHT = 'h-8';
+// 头部高度 class
+export const HEADER_HEIGHT = 'h-12';
 
 // 广受好评的字体配置（包含中文支持）
 export const FONT_FAMILIES = [
@@ -65,11 +65,11 @@ export const FONT_FAMILIES = [
 
 // 字体大小选项
 export const FONT_OPTIONS = [
-  { label: 'Tiny', size: 'text-xs', leading: 'leading-5', name: 'Tiny' },
-  { label: 'Small', size: 'text-sm', leading: 'leading-6', name: 'Small' },
-  { label: 'Medium', size: 'text-base', leading: 'leading-7', name: 'Medium' },
-  { label: 'Large', size: 'text-lg', leading: 'leading-8', name: 'Large' },
-  { label: 'XLarge', size: 'text-xl', leading: 'leading-9', name: 'Extra Large' },
+  { label: 'Tiny', size: 'text-xs', leading: 'leading-5', name: 'Tiny', previewSize: '0.75rem' },
+  { label: 'Small', size: 'text-sm', leading: 'leading-6', name: 'Small', previewSize: '0.875rem' },
+  { label: 'Medium', size: 'text-base', leading: 'leading-7', name: 'Medium', previewSize: '1rem' },
+  { label: 'Large', size: 'text-lg', leading: 'leading-8', name: 'Large', previewSize: '1.125rem' },
+  { label: 'XLarge', size: 'text-xl', leading: 'leading-9', name: 'Extra Large', previewSize: '1.25rem' },
 ];
 
 // 阅读背景色配置

@@ -2,47 +2,177 @@
 @tailwind components;
 @tailwind utilities;
 
-/* === 1. 全局基础 === */
-body {
-  background-color: #F5F5F7; /* Apple 浅灰底色 */
-  color: #1D1D1F;
-  margin: 0;
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden; /* 禁止整个窗口滚动，只让内容区滚动 */
-}
-
-/* === 2. 极简滚动条 (隐藏式) === */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 4px;
-}
-
-/* === 3. A4 纸张物理模拟 (核心) === */
-.a4-paper {
-  width: 210mm;         /* 严格 A4 宽度 */
-  min-height: 297mm;    /* 严格 A4 高度 */
-  padding: 20mm;        /* 页边距 */
-  background: white;
-  margin: 0 auto;       /* 居中 */
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); /* 柔和阴影 */
-}
-
-/* === 4. PDF 导出逻辑 (打印拦截) === */
-@media print {
-  body * { visibility: hidden; } /* 隐藏所有 UI */
-  #print-target, #print-target * { 
-    visibility: visible; /* 只显示 A4 纸 */
+@layer base {
+  :root {
+    --jm-window-bg: #edf1f5;
+    --jm-text: #111827;
+    --jm-muted: #667085;
+    --jm-accent: #2563eb;
+    --jm-accent-soft: rgba(37, 99, 235, 0.1);
+    --jm-panel: rgba(255, 255, 255, 0.72);
+    --jm-panel-strong: rgba(255, 255, 255, 0.88);
+    --jm-panel-border: rgba(15, 23, 42, 0.08);
+    --jm-panel-shadow: 0 18px 46px rgba(15, 23, 42, 0.1);
   }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    width: 100vw;
+    overflow: hidden;
+    color: var(--jm-text);
+    font-family: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    background:
+      radial-gradient(circle at top left, rgba(255, 255, 255, 0.98), transparent 30%),
+      linear-gradient(180deg, #f8f9fb 0%, var(--jm-window-bg) 100%);
+  }
+}
+
+@layer components {
+  .jm-window {
+    @apply h-screen w-screen overflow-hidden p-2.5;
+  }
+
+  .jm-shell {
+    @apply flex h-full flex-col overflow-hidden rounded-[18px];
+    background: linear-gradient(180deg, rgba(255,255,255,0.78) 0%, rgba(246,248,251,0.86) 100%);
+    border: 1px solid rgba(15, 23, 42, 0.06);
+    box-shadow: 0 18px 46px rgba(15, 23, 42, 0.1);
+    backdrop-filter: blur(22px);
+  }
+
+  .jm-toolbar {
+    @apply flex items-center gap-3 px-4 py-2.5;
+    background: rgba(248, 249, 251, 0.72);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+    backdrop-filter: blur(18px);
+  }
+
+  .jm-toolbar-group {
+    @apply flex items-center gap-1 rounded-[12px] px-1.5 py-1;
+    background: rgba(255, 255, 255, 0.54);
+    border: 1px solid rgba(15, 23, 42, 0.045);
+  }
+
+  .jm-button {
+    @apply inline-flex items-center justify-center rounded-[10px] px-2.5 py-1.5 text-[12px] font-medium transition-all duration-150;
+    background: transparent;
+    border: 1px solid transparent;
+    box-shadow: none;
+    color: var(--jm-text);
+  }
+
+  .jm-button:hover {
+    background: rgba(15, 23, 42, 0.055);
+    border-color: rgba(15, 23, 42, 0.05);
+  }
+
+  .jm-button:active {
+    background: rgba(15, 23, 42, 0.08);
+    transform: translateY(0.5px);
+  }
+
+  .jm-button-primary {
+    background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(244,246,248,0.94) 100%);
+    border: 1px solid rgba(15, 23, 42, 0.07);
+    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+
+  .jm-button-accent {
+    color: white;
+    background: linear-gradient(180deg, #4f8dfd 0%, #2563eb 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 20px rgba(37, 99, 235, 0.2);
+  }
+
+  .jm-title-badge {
+    @apply inline-flex items-center gap-2 rounded-[14px] px-3 py-1.5 text-[12px];
+    background: rgba(255, 255, 255, 0.56);
+    border: 1px solid rgba(15, 23, 42, 0.045);
+  }
+
+  .jm-panel {
+    background: var(--jm-panel);
+    border: 1px solid rgba(15, 23, 42, 0.05);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.07);
+    backdrop-filter: blur(18px);
+  }
+
+  .jm-editor-surface {
+    @apply rounded-[18px];
+    background: linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(249,250,251,0.98) 100%);
+    border: 1px solid rgba(15, 23, 42, 0.06);
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+  }
+
+  .jm-preview-surface {
+    @apply rounded-[18px];
+    background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.97) 100%);
+    border: 1px solid rgba(15, 23, 42, 0.06);
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.07);
+  }
+
+  .jm-statusbar {
+    background: rgba(248, 249, 251, 0.72);
+    border-top: 1px solid rgba(15, 23, 42, 0.06);
+    backdrop-filter: blur(18px);
+  }
+
+  .jm-traffic-lights {
+    @apply flex items-center gap-2;
+  }
+
+  .jm-traffic-dot {
+    @apply h-3 w-3 rounded-full;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), 0 0 0 0.5px rgba(15,23,42,0.12);
+  }
+}
+
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.2);
+  border-radius: 999px;
+}
+
+.a4-paper {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 20mm;
+  background: white;
+  margin: 0 auto;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #print-target,
+  #print-target * {
+    visibility: visible;
+  }
+
   #print-target {
     position: absolute;
-    left: 0; top: 0;
-    margin: 0; padding: 0;
+    left: 0;
+    top: 0;
+    margin: 0;
+    padding: 0;
     width: 100%;
     box-shadow: none;
   }

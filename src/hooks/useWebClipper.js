@@ -124,32 +124,27 @@ export function useWebClipper() {
             return;
         }
 
-        try {
-            const clippedContent = await clipUrl(selectedText);
+        const clippedContent = await clipUrl(selectedText);
 
-            // Ensure the selection is still valid
+        // Ensure the selection is still valid
+        textareaElement.focus();
+        textareaElement.setSelectionRange(start, end);
+
+        // Use insertTextWithUndo for undo support
+        insertTextWithUndo(textareaElement, clippedContent);
+
+        // Update React state to sync
+        setMarkdown(textareaElement.value);
+        setHasUnsavedChanges(true);
+
+        // Move cursor to end of inserted content
+        setTimeout(() => {
             textareaElement.focus();
-            textareaElement.setSelectionRange(start, end);
+            const newCursorPos = start + clippedContent.length;
+            textareaElement.setSelectionRange(newCursorPos, newCursorPos);
+        }, 0);
 
-            // Use insertTextWithUndo for undo support
-            insertTextWithUndo(textareaElement, clippedContent);
-
-            // Update React state to sync
-            setMarkdown(textareaElement.value);
-            setHasUnsavedChanges(true);
-
-            // Move cursor to end of inserted content
-            setTimeout(() => {
-                textareaElement.focus();
-                const newCursorPos = start + clippedContent.length;
-                textareaElement.setSelectionRange(newCursorPos, newCursorPos);
-            }, 0);
-
-            return clippedContent;
-        } catch (err) {
-            // Error is already set by clipUrl
-            throw err;
-        }
+        return clippedContent;
     }, [clipUrl]);
 
     const clearError = useCallback(() => {

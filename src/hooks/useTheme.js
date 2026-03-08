@@ -1,28 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FONT_OPTIONS, FONT_FAMILIES, BACKGROUND_COLORS } from '../constants/theme';
-
-/**
- * 从 localStorage 加载保存的状态
- */
-const loadSavedState = (key, defaultValue) => {
-    try {
-        const saved = localStorage.getItem(key);
-        if (saved !== null) {
-            return JSON.parse(saved);
-        }
-    } catch (error) {
-        console.error(`加载状态失败 (${key}):`, error);
-    }
-    return defaultValue;
-};
-
-const saveState = (key, value) => {
-    try {
-        localStorage.setItem(key, JSON.stringify(value));
-    } catch (error) {
-        console.error(`保存状态失败 (${key}):`, error);
-    }
-};
+import { loadSavedState, saveState, subscribeToStoredState } from '../utils/storage';
 
 /**
  * 主题管理 Hook
@@ -45,11 +23,13 @@ export function useTheme() {
     useEffect(() => { saveState('isDarkMode', isDarkMode); }, [isDarkMode]);
     useEffect(() => { saveState('fontIndex', fontIndex); }, [fontIndex]);
     useEffect(() => { saveState('fontFamilyIndex', fontFamilyIndex); }, [fontFamilyIndex]);
-    useEffect(() => {
-        saveState('bgColorIndex', bgColorIndex);
-        setPreviewBgColorIndex(null);
-    }, [bgColorIndex]);
+    useEffect(() => { saveState('bgColorIndex', bgColorIndex); }, [bgColorIndex]);
     useEffect(() => { saveState('previewBgColorIndex', previewBgColorIndex); }, [previewBgColorIndex]);
+    useEffect(() => subscribeToStoredState('isDarkMode', setIsDarkMode), []);
+    useEffect(() => subscribeToStoredState('fontIndex', setFontIndex), []);
+    useEffect(() => subscribeToStoredState('fontFamilyIndex', setFontFamilyIndex), []);
+    useEffect(() => subscribeToStoredState('bgColorIndex', setBgColorIndex), []);
+    useEffect(() => subscribeToStoredState('previewBgColorIndex', setPreviewBgColorIndex), []);
 
     // 派生值
     const currentFont = FONT_OPTIONS[fontIndex];

@@ -28,4 +28,27 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+
+  // 性能优化配置
+  build: {
+    // 代码分割优化
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'markdown-core': ['react-markdown', 'remark-gfm'],
+          'vendor': ['react', 'react-dom']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000,
+    minify: 'esbuild',
+    cssCodeSplit: true,
+    sourcemap: false
+  },
+
+  // 优化依赖预构建
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-markdown'],
+    exclude: ['html2canvas', 'jspdf', 'docx', 'remark-math', 'rehype-katex', 'katex']
+  }
 }));

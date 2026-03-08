@@ -175,7 +175,7 @@ function extractWeChatContent(doc) {
 /**
  * Extract content from generic pages with fallback methods
  */
-function extractGenericContent(doc, sourceUrl) {
+function extractGenericContent(doc) {
     // Pre-process: convert lazy-loaded images
     doc.querySelectorAll('img[data-src]').forEach(img => {
         const dataSrc = img.getAttribute('data-src');
@@ -267,7 +267,7 @@ export function htmlToMarkdown(html, sourceUrl) {
         }
     } else {
         // Generic page
-        article = extractGenericContent(doc, sourceUrl);
+        article = extractGenericContent(doc);
         if (!article) {
             throw new Error('Could not extract content from the page');
         }

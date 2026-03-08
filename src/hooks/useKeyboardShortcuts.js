@@ -56,6 +56,11 @@ export const useKeyboardShortcuts = (handlers) => {
         e.preventDefault();
         handlers.onLink();
       }
+      // Cmd+, - Preferences
+      else if (key === ',' && !withShift && handlers.onPreferences) {
+        e.preventDefault();
+        handlers.onPreferences();
+      }
       // Cmd+Shift+V - Paste Plain Text
       else if (key === 'v' && withShift && handlers.onPastePlain) {
         e.preventDefault();
