@@ -208,7 +208,7 @@ function App() {
   const {
     selectedSidebarPath,
     selectSidebarPath,
-    activateSidebarEntry,
+    activateSidebarEntry, // eslint-disable-line no-unused-vars
     handleSidebarKeyDown,
   } = useSidebarSelection({
     currentFilePath,

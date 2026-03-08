@@ -15,10 +15,10 @@ export function useNoticeDialog({
     setNotice({
       mode: 'delete-entry',
       title: 'Move to Trash?',
-      message: `“${getBaseName(targetPath)}” will be removed from this workspace immediately. This action cannot be undone.`,
+      message: `”${getBaseName(targetPath)}” will be removed from this workspace immediately. This action cannot be undone.`,
       targetPath,
     });
-  }, [getBaseName]);
+  }, [getBaseName, setNotice]);
 
   const activeNotice = notice || unsavedNotice;
 
@@ -52,7 +52,7 @@ export function useNoticeDialog({
     }
 
     await confirmReplacementNotice(activeNotice);
-  }, [activeNotice, confirmReplacementNotice, fileOps, onConfirmUnsavedAction]);
+  }, [activeNotice, confirmReplacementNotice, fileOps, onConfirmUnsavedAction, setNotice]);
 
   const handleSecondary = useCallback(async () => {
     if (activeNotice?.mode === 'unsaved-document') {
@@ -67,7 +67,7 @@ export function useNoticeDialog({
     }
 
     setNotice(null);
-  }, [activeNotice?.mode, onClearUnsavedAction]);
+  }, [activeNotice?.mode, onClearUnsavedAction, setNotice]);
 
   const dialogProps = useMemo(() => ({
     isOpen: Boolean(activeNotice),

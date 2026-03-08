@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 export function useSidebarSelection({
   currentFilePath,
@@ -8,7 +8,16 @@ export function useSidebarSelection({
   onToggleFolder,
   sidebarRef,
 }) {
-  const [selectedSidebarPath, setSelectedSidebarPath] = useState(null);
+  const [manualSelection, setManualSelection] = useState(null);
+
+  const selectedSidebarPath = useMemo(() => {
+    if (!currentFolder) return null;
+    if (currentFilePath) return currentFilePath;
+    if (manualSelection && (manualSelection === currentFolder || manualSelection.startsWith(`${currentFolder}/`))) {
+      return manualSelection;
+    }
+    return folderContents[0]?.path || null;
+  }, [currentFilePath, currentFolder, folderContents, manualSelection]);
 
   const focusSidebarNode = useCallback((path) => {
     if (!path) return;
@@ -23,7 +32,7 @@ export function useSidebarSelection({
 
   const selectSidebarPath = useCallback((path) => {
     if (!path) return;
-    setSelectedSidebarPath(path);
+    setManualSelection(path);
     focusSidebarNode(path);
   }, [focusSidebarNode]);
 
@@ -114,31 +123,6 @@ export function useSidebarSelection({
       activateSidebarEntry(currentPath, isDirectory);
     }
   }, [activateSidebarEntry, currentFolder, onToggleFolder, selectSidebarPath, selectedSidebarPath, sidebarRef]);
-
-  useEffect(() => {
-    if (currentFilePath) {
-      setSelectedSidebarPath(currentFilePath);
-    }
-  }, [currentFilePath]);
-
-  useEffect(() => {
-    if (!currentFolder) {
-      setSelectedSidebarPath(null);
-      return;
-    }
-
-    setSelectedSidebarPath((prev) => {
-      if (prev && (prev === currentFolder || prev.startsWith(`${currentFolder}/`))) {
-        return prev;
-      }
-
-      if (currentFilePath?.startsWith(`${currentFolder}/`)) {
-        return currentFilePath;
-      }
-
-      return folderContents[0]?.path || null;
-    });
-  }, [currentFilePath, currentFolder, folderContents]);
 
   return {
     selectedSidebarPath,
