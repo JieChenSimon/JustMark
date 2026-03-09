@@ -16,11 +16,11 @@ export const InlineCreateRow = memo(function InlineCreateRow({
     const indent = level * 12;
     return (
         <div
-            className="w-full px-2 py-1 text-left text-[11px] flex items-center gap-1.5 transition-all group"
+            className="w-full px-1.5 py-0.5 text-left text-[11px] flex items-center gap-1 transition-all group"
         >
             <span className="shrink-0" style={{ width: `${indent + 8}px` }} />
             <span className="flex-shrink-0 text-slate-400">
-                {type === 'folder' ? <IconFolder className="h-4 w-4" /> : <IconDocument className="h-4 w-4" />}
+                {type === 'folder' ? <IconFolder className="h-[15px] w-[15px]" /> : <IconDocument className="h-[15px] w-[15px]" />}
             </span>
             <input
                 ref={inputRef}
@@ -256,7 +256,7 @@ export const FileTreeItem = memo(function FileTreeItem({
                 onDragEnd={handleDragEnd}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
-                className={`px-2.5 py-1.5 text-left text-[11px] flex items-center gap-1.5 transition-all group rounded-[10px] ${isDropTarget
+                className={`px-2 py-1 text-left text-[11px] flex items-center gap-1 transition-all group rounded-[9px] ${isDropTarget
                     ? 'bg-[#dce9ff] dark:bg-blue-500/20 ring-1 ring-inset ring-[#9dbaf6] dark:ring-blue-400/40 shadow-[0_0_0_1px_rgba(59,130,246,0.06)]'
                     : isInvalidDropTarget
                         ? 'bg-red-500/6 ring-1 ring-inset ring-red-500/35'
@@ -278,7 +278,7 @@ export const FileTreeItem = memo(function FileTreeItem({
                 )}
                 {!entry.isDirectory && <span className="w-3 h-3 shrink-0" />}
                 <span className={`flex-shrink-0 ${isSelected ? 'opacity-100 text-[#315fca] dark:text-blue-300' : 'opacity-70 text-slate-400 dark:text-slate-500'}`}>
-                    {entry.isDirectory ? <IconFolder className="h-4 w-4" /> : <IconDocument className="h-4 w-4" />}
+                    {entry.isDirectory ? <IconFolder className="h-[15px] w-[15px]" /> : <IconDocument className="h-[15px] w-[15px]" />}
                 </span>
                 {isRenaming ? (
                     <input
@@ -434,7 +434,7 @@ export const FileTreeItem = memo(function FileTreeItem({
             {entry.isDirectory && isExpanded && (
                 <div>
                     {isLoading ? (
-                        <div className="w-full px-2 py-1 text-[10px] text-slate-400">
+                        <div className="w-full px-1.5 py-0.5 text-[10px] text-slate-400">
                             <span className="inline-block" style={{ width: `${indent + 24}px` }} />
                             Loading…
                         </div>

@@ -359,7 +359,12 @@ function App() {
         '--jm-window-bg': appBgColor,
       }}
     >
-      <div className="jm-shell">
+      <div className="jm-shell relative">
+        <div
+          data-tauri-drag-region
+          className="pointer-events-auto absolute inset-x-0 top-0 z-30 h-5"
+          style={{ backgroundColor: 'transparent' }}
+        />
         <main className="flex min-h-0 flex-1 gap-1 overflow-hidden p-1">
         {sidebarVisible && (
           <SidebarPanel
