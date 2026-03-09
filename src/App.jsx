@@ -1,3 +1,4 @@
+/* @refresh reset */
 import { useState, useRef, useDeferredValue, useCallback } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -17,11 +18,13 @@ import { useDocumentLifecycle } from './hooks/useDocumentLifecycle';
 import { useInlineCreate } from './hooks/useInlineCreate';
 import { useNoticeDialog } from './hooks/useNoticeDialog';
 import { useUnsavedChangesGuard } from './hooks/useUnsavedChangesGuard';
-import AppToolbar from './components/Header/AppToolbar';
 import EditorArea from './components/EditorArea';
-import StatusBar from './components/StatusBar';
 import MarkdownPreview from './components/preview/MarkdownPreview';
+import PDFPreview from './components/preview/PDFPreview';
+import FilePreview from './components/preview/FilePreview';
 import { useExportManager } from './components/Export/ExportManager';
+import { useResizable } from './hooks/useResizable';
+import PreviewColorPicker from './components/PreviewColorPicker';
 import DragNoticeOverlay from './components/sidebar/DragNoticeOverlay';
 import SidebarPanel from './components/sidebar/SidebarPanel';
 import ConfirmDialog from './components/ConfirmDialog';
@@ -39,9 +42,19 @@ function App() {
     isDarkMode,
     currentFont,
     currentFontFamily,
+    currentBgColor,
     appBgColor,
     appTextColor,
+    previewBgColor,
     previewTextColor,
+    bgColorIndex,
+    setBgColorIndex,
+    previewBgColorIndex,
+    setPreviewBgColorIndex,
+    showBgColorMenu,
+    setShowBgColorMenu,
+    showPreviewBgColorMenu,
+    setShowPreviewBgColorMenu,
     toggleTheme,
     increaseFontSize,
     decreaseFontSize
@@ -54,8 +67,9 @@ function App() {
   } = useSettings();
   const { recentFiles, addRecentFile, clearRecentFiles, replaceRecentFilePath, removeRecentFilePrefix } = useRecentFiles();
   const { chars, words, lines } = useWordCount(markdown);
-  const { sidebarWidth, editorWidth } = useWindowManager();
+  const { sidebarWidth, isDraggingSidebar, setIsDraggingSidebar } = useWindowManager();
   const { isExporting, exportToPDF, exportToDOCX } = useExportManager();
+  const { width: editorWidth, isDragging, handleMouseDown } = useResizable(50, 30, 70);
 
   const [currentFilePath, setCurrentFilePath] = useLocalStorage('currentFilePath', null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -64,8 +78,10 @@ function App() {
   const [expandedFolders, setExpandedFolders] = useState(new Set());
   const [fileTags, setFileTags] = useLocalStorage('justmark_file_tags', {});
   const [previewVisible, setPreviewVisible] = useLocalStorage('previewVisible', true);
+  const [previewMode, setPreviewMode] = useLocalStorage('previewMode', 'markdown');
   const [sidebarVisible, setSidebarVisible] = useLocalStorage('sidebarVisible', false);
   const [dragNotice, setDragNotice] = useState(null);
+  const [previewFilePath, setPreviewFilePath] = useState(null);
 
   const inlineCreateInputRef = useRef(null);
   const previewSectionRef = useRef(null);
@@ -97,6 +113,7 @@ function App() {
     setCurrentFolder,
     setFolderContents,
     setExpandedFolders,
+    setPreviewFilePath,
     sortEntries: (entries) => sortEntries(entries, fileSortBy),
     parseTags,
     setFileTags,
@@ -325,6 +342,7 @@ function App() {
     bringAllToFront: () => void bringAllToFront(),
     toggleSidebar: () => setSidebarVisible((prev) => !prev),
     togglePreview: () => setPreviewVisible((prev) => !prev),
+    toggleThemeMode: () => setPreviewMode((prev) => prev === 'markdown' ? 'pdf' : 'markdown'),
     increaseFont: () => increaseFontSize(),
     decreaseFont: () => decreaseFontSize(),
     toggleTheme: () => toggleTheme(),
@@ -333,30 +351,16 @@ function App() {
   }, recentFiles);
 
   return (
-    <div className={`${isDarkMode ? 'dark' : ''} jm-window`} style={{ color: appTextColor }}>
+    <div
+      className={`${isDarkMode ? 'dark' : ''} jm-window`}
+      style={{
+        color: appTextColor,
+        backgroundColor: appBgColor,
+        '--jm-window-bg': appBgColor,
+      }}
+    >
       <div className="jm-shell">
-        <AppToolbar
-          currentFilePath={currentFilePath}
-          currentFolder={currentFolder}
-          hasUnsavedChanges={hasUnsavedChanges}
-          previewVisible={previewVisible}
-          sidebarVisible={sidebarVisible}
-          isExporting={isExporting}
-          onNew={() => requestActionWithUnsavedGuard(async () => handleNewFile())}
-          onOpen={() => requestActionWithUnsavedGuard(async () => fileOps.handleOpenFile())}
-          onSave={fileOps.handleSave}
-          onExportPDF={handleExportPDF}
-          onExportDOCX={handleExportDOCX}
-          onToggleSidebar={() => setSidebarVisible(!sidebarVisible)}
-          onTogglePreview={() => setPreviewVisible(!previewVisible)}
-          onDecreaseFontSize={decreaseFontSize}
-          onIncreaseFontSize={increaseFontSize}
-          onCloseWindow={handleCloseWindow}
-          onMinimizeWindow={handleMinimizeWindow}
-          onToggleMaximizeWindow={handleToggleMaximizeWindow}
-        />
-
-        <main className="flex-1 flex overflow-hidden p-3 gap-3">
+        <main className="flex min-h-0 flex-1 gap-1 overflow-hidden p-1">
         {sidebarVisible && (
           <SidebarPanel
             currentFilePath={currentFilePath}
@@ -406,7 +410,17 @@ function App() {
           />
         )}
 
-        <section style={{ width: previewVisible ? `${editorWidth}%` : '100%' }} className="overflow-hidden">
+        {sidebarVisible && (
+          <div
+            onMouseDown={() => setIsDraggingSidebar(true)}
+            className={`flex-shrink-0 w-1 cursor-col-resize hover:bg-blue-500/50 transition-colors ${isDraggingSidebar ? 'bg-blue-500' : ''}`}
+          />
+        )}
+
+        <section
+          style={{ width: previewVisible ? `${editorWidth}%` : '100%' }}
+          className="flex min-h-0 overflow-hidden"
+        >
           <EditorArea
             ref={editorAreaRef}
             markdown={markdown}
@@ -422,27 +436,77 @@ function App() {
             onToggleSidebar={setSidebarVisible}
             previewVisible={previewVisible}
             onTogglePreview={() => setPreviewVisible(!previewVisible)}
+            chars={chars}
+            words={words}
+            lines={lines}
           />
         </section>
 
         {previewVisible && (
+          <div
+            onMouseDown={handleMouseDown}
+            className={`flex-shrink-0 w-1 cursor-col-resize hover:bg-blue-500/50 transition-colors ${isDragging ? 'bg-blue-500' : ''}`}
+          />
+        )}
+
+        {previewVisible && (
           <section
-            ref={previewSectionRef}
-            className="jm-preview-surface flex-1 overflow-y-auto p-10"
+            className="jm-preview-surface flex min-h-0 flex-1 flex-col overflow-hidden"
             style={{
+              backgroundColor: previewMode === 'markdown' ? previewBgColor : 'rgba(226, 232, 240, 0.52)',
               color: previewTextColor,
-              fontSize: currentFont.previewSize,
-              fontFamily: currentFontFamily.family
             }}
           >
-            <div className={`prose mx-auto max-w-4xl ${isDarkMode ? 'prose-invert' : ''}`}>
-              <MarkdownPreview content={deferredMarkdown} attachmentFolder={attachmentFolder} />
-            </div>
+            {previewFilePath ? (
+              <div className="flex-1 min-h-0">
+                <FilePreview filePath={previewFilePath} />
+              </div>
+            ) : previewMode === 'markdown' ? (
+              <div className="jm-preview-scroll min-h-0 flex-1 overflow-y-auto px-8 py-8">
+                <article
+                  ref={previewSectionRef}
+                  className="jm-markdown-preview mx-auto max-w-4xl"
+                  style={{
+                    color: previewTextColor,
+                    fontSize: currentFont.previewSize,
+                    fontFamily: currentFontFamily.family,
+                  }}
+                >
+                  <MarkdownPreview content={deferredMarkdown} attachmentFolder={attachmentFolder} />
+                </article>
+              </div>
+            ) : (
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <PDFPreview
+                  content={deferredMarkdown}
+                  attachmentFolder={attachmentFolder}
+                  fontFamily={currentFontFamily.family}
+                  fontSize={currentFont.previewSize}
+                  pageRef={previewSectionRef}
+                />
+              </div>
+            )}
           </section>
         )}
       </main>
 
-        <StatusBar currentFilePath={currentFilePath} chars={chars} words={words} lines={lines} />
+        {previewVisible && previewMode === 'markdown' && (
+          <PreviewColorPicker
+            previewBgColor={previewBgColor}
+            previewBgColorIndex={previewBgColorIndex}
+            showMenu={showPreviewBgColorMenu}
+            onToggleMenu={() => setShowPreviewBgColorMenu((prev) => !prev)}
+            onColorSelect={(index) => {
+              setPreviewBgColorIndex(index);
+              setShowPreviewBgColorMenu(false);
+            }}
+            onReset={() => {
+              setPreviewBgColorIndex(null);
+              setShowPreviewBgColorMenu(false);
+            }}
+          />
+        )}
+
       </div>
 
       <DragNoticeOverlay dragOperation={dragOperation} draggedPath={draggedPath} getBaseName={getBaseName} />

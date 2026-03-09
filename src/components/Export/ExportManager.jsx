@@ -13,6 +13,9 @@ export const useExportManager = () => {
       ]);
 
       const element = previewRef.current;
+      if (!element) {
+        throw new Error('Preview surface is not ready');
+      }
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,

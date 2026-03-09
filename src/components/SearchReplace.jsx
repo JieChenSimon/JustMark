@@ -170,9 +170,16 @@ const SearchReplace = forwardRef(function SearchReplace({
   if (!isOpen) return null;
 
   return (
-    <div className="absolute inset-x-4 top-4 z-30">
-      <div className="mx-auto max-w-[760px] rounded-[14px] border border-slate-200/80 bg-[rgba(248,249,251,0.96)] px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-        <div className="flex items-center gap-2">
+    <div
+      className="absolute inset-0 z-30"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div className="absolute left-1/2 top-12 -translate-x-1/2 w-[480px] rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white/96 dark:bg-slate-800/96 px-2.5 py-2 shadow-[0_8px_20px_rgba(15,23,42,0.12)] backdrop-blur-xl">
+        <div className="flex items-center gap-1.5">
           <input
             ref={searchInputRef}
             type="text"
@@ -180,83 +187,85 @@ const SearchReplace = forwardRef(function SearchReplace({
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Find"
-            className="min-w-0 flex-[1.2] rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-900 outline-none transition focus:border-blue-400"
+            className="min-w-0 flex-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-2.5 py-1 text-[11px] text-slate-900 dark:text-slate-100 outline-none transition focus:border-blue-400 dark:focus:border-blue-500"
           />
-          <div className="min-w-[72px] text-right text-[10px] text-slate-500">
-            {totalMatches > 0 ? `${activeMatch} of ${totalMatches}` : 'No Results'}
+          <div className="min-w-[60px] text-right text-[10px] text-slate-500 dark:text-slate-400">
+            {totalMatches > 0 ? `${activeMatch}/${totalMatches}` : 'No results'}
           </div>
           <button
             onClick={handlePrevious}
             disabled={totalMatches === 0}
-            className="jm-button h-8 w-8 rounded-[10px] px-0 disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-30 transition-colors"
             title="Previous (Shift+Enter)"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
             </svg>
           </button>
           <button
             onClick={handleNext}
             disabled={totalMatches === 0}
-            className="jm-button h-8 w-8 rounded-[10px] px-0 disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-30 transition-colors"
             title="Next (Enter)"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
-          {replaceVisible ? (
-            <>
-              <input
-                type="text"
-                value={replaceTerm}
-                onChange={(e) => setReplaceTerm(e.target.value)}
-                placeholder="Replace"
-                className="min-w-0 flex-1 rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-900 outline-none transition focus:border-blue-400"
-                onKeyDown={handleKeyDown}
-              />
-              <button
-                onClick={handleReplace}
-                disabled={totalMatches === 0}
-                className="jm-button jm-button-primary px-3 py-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Replace
-              </button>
-              <button
-                onClick={handleReplaceAll}
-                disabled={totalMatches === 0}
-                className="jm-button px-3 py-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                All
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => setReplaceVisible(true)}
-              className="jm-button px-3 py-2 text-[11px]"
-            >
-              Replace
-            </button>
-          )}
-          <label className="flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-400 cursor-pointer hover:text-slate-800 dark:hover:text-slate-300 transition-colors duration-200">
+          <button
+            onClick={() => setReplaceVisible(!replaceVisible)}
+            className="h-6 px-2 flex items-center justify-center rounded-md text-[10px] font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            title="Toggle Replace"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+          </button>
+          <label className="flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-400 cursor-pointer hover:text-slate-800 dark:hover:text-slate-300 transition-colors" title="Match Case">
             <input
               type="checkbox"
               checked={caseSensitive}
               onChange={(e) => setCaseSensitive(e.target.checked)}
               className="w-3 h-3 rounded border-gray-300 dark:border-gray-600 text-blue-500 focus:ring-1 focus:ring-blue-500/50"
             />
-            Match Case
+            Aa
           </label>
           <button
-            onClick={() => {
-              setReplaceVisible(false);
-              onClose();
-            }}
-            className="jm-button ml-auto h-8 rounded-[10px] px-3 text-[11px] text-slate-500"
+            onClick={onClose}
+            className="ml-auto h-6 w-6 flex items-center justify-center rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            title="Close (Esc)"
           >
-            Done
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
+        {replaceVisible && (
+          <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-slate-200/60 dark:border-slate-700/60">
+            <input
+              type="text"
+              value={replaceTerm}
+              onChange={(e) => setReplaceTerm(e.target.value)}
+              placeholder="Replace"
+              className="min-w-0 flex-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-2.5 py-1 text-[11px] text-slate-900 dark:text-slate-100 outline-none transition focus:border-blue-400 dark:focus:border-blue-500"
+              onKeyDown={handleKeyDown}
+            />
+            <button
+              onClick={handleReplace}
+              disabled={totalMatches === 0}
+              className="h-6 px-2.5 flex items-center justify-center rounded-md text-[10px] font-medium bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              Replace
+            </button>
+            <button
+              onClick={handleReplaceAll}
+              disabled={totalMatches === 0}
+              className="h-6 px-2.5 flex items-center justify-center rounded-md text-[10px] font-medium hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              All
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

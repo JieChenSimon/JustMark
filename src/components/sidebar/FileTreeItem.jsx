@@ -17,8 +17,8 @@ export const InlineCreateRow = memo(function InlineCreateRow({
     return (
         <div
             className="w-full px-2 py-1 text-left text-[11px] flex items-center gap-1.5 transition-all group"
-            style={{ paddingLeft: `${indent + 8}px` }}
         >
+            <span className="shrink-0" style={{ width: `${indent + 8}px` }} />
             <span className="flex-shrink-0 text-slate-400">
                 {type === 'folder' ? <IconFolder className="h-4 w-4" /> : <IconDocument className="h-4 w-4" />}
             </span>
@@ -50,6 +50,7 @@ export const InlineCreateRow = memo(function InlineCreateRow({
 export const FileTreeItem = memo(function FileTreeItem({
     entry,
     basePath,
+    rootPath,
     level,
     currentFilePath,
     selectedSidebarPath,
@@ -78,6 +79,15 @@ export const FileTreeItem = memo(function FileTreeItem({
     invalidDropPath,
     dragOperation
 }) {
+    const TREE_DEBUG_PATTERN = /00- 雅思-口语|Hu et al\.|面签英语/;
+    const resolveEntryPath = (item, parentPath) => item.path || `${parentPath}/${item.name}`;
+    const getParentPath = (path) => path.slice(0, path.lastIndexOf('/'));
+    const getPathDepth = (path, ancestorPath) => {
+        if (!path || !ancestorPath || !path.startsWith(ancestorPath)) return 0;
+        const relativePath = path.slice(ancestorPath.length);
+        const segments = relativePath.split('/').filter(Boolean);
+        return Math.max(0, segments.length - 1);
+    };
     const [children, setChildren] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [contextMenu, setContextMenu] = useState(null);
@@ -85,17 +95,37 @@ export const FileTreeItem = memo(function FileTreeItem({
     const [renameValue, setRenameValue] = useState(entry.name);
     const renameInputRef = useRef(null);
     const dragPreviewRef = useRef(null);
-    const fullPath = basePath + '/' + entry.name;
+    const fullPath = resolveEntryPath(entry, basePath);
+    const parentPath = getParentPath(fullPath);
     const isExpanded = expandedFolders.has(fullPath);
     const isCurrentDocument = currentFilePath === fullPath;
     const isSelected = selectedSidebarPath === fullPath;
-    const indent = level * 12;
+    const indent = getPathDepth(fullPath, rootPath) * 12;
     const isDragged = draggedPath === fullPath;
     const isDropTarget = dropTargetPath === fullPath;
     const isInvalidDropTarget = invalidDropPath === fullPath;
 
     useEffect(() => {
-        const shouldLoad = entry.isDirectory && isExpanded && (children.length === 0 || (folderRefreshTimestamps && folderRefreshTimestamps[fullPath]));
+        if (!import.meta.env.DEV || !TREE_DEBUG_PATTERN.test(fullPath)) {
+            return;
+        }
+
+        console.log('[tree-node]', {
+            name: entry.name,
+            fullPath,
+            basePath,
+            parentPath,
+            rootPath,
+            level,
+            indent,
+            isDirectory: entry.isDirectory,
+            isExpanded,
+            childCount: children.length,
+        });
+    }, [basePath, children.length, entry.isDirectory, entry.name, fullPath, indent, isExpanded, level, parentPath, rootPath]);
+
+    useEffect(() => {
+        const shouldLoad = entry.isDirectory && isExpanded;
 
         if (!shouldLoad) {
             return;
@@ -110,6 +140,16 @@ export const FileTreeItem = memo(function FileTreeItem({
                 if (!cancelled) {
                     setChildren(contents);
                     setIsLoading(false);
+
+                    if (import.meta.env.DEV && TREE_DEBUG_PATTERN.test(fullPath)) {
+                        console.groupCollapsed(`[tree-children] ${fullPath}`);
+                        console.table(contents.map((child) => ({
+                            name: child.name,
+                            path: child.path,
+                            isDirectory: child.isDirectory,
+                        })));
+                        console.groupEnd();
+                    }
                 }
             })
             .catch(() => {
@@ -122,7 +162,7 @@ export const FileTreeItem = memo(function FileTreeItem({
         return () => {
             cancelled = true;
         };
-    }, [children.length, entry.isDirectory, folderRefreshTimestamps, fullPath, getSubfolderContents, isExpanded]);
+    }, [entry.isDirectory, folderRefreshTimestamps, fullPath, getSubfolderContents, isExpanded]);
 
     const handleClick = () => {
         if (onSelectEntry) {
@@ -206,7 +246,7 @@ export const FileTreeItem = memo(function FileTreeItem({
             <button
                 data-tree-node="true"
                 data-path={fullPath}
-                data-parent-path={basePath}
+                data-parent-path={parentPath}
                 data-is-directory={entry.isDirectory ? 'true' : 'false'}
                 data-expanded={isExpanded ? 'true' : 'false'}
                 onClick={handleClick}
@@ -216,19 +256,19 @@ export const FileTreeItem = memo(function FileTreeItem({
                 onDragEnd={handleDragEnd}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
-                className={`w-full px-2.5 py-1.5 text-left text-[11px] flex items-center gap-1.5 transition-all group rounded-[10px] ${isDropTarget
-                    ? 'bg-[#dce9ff] ring-1 ring-inset ring-[#9dbaf6] shadow-[0_0_0_1px_rgba(59,130,246,0.06)]'
+                className={`px-2.5 py-1.5 text-left text-[11px] flex items-center gap-1.5 transition-all group rounded-[10px] ${isDropTarget
+                    ? 'bg-[#dce9ff] dark:bg-blue-500/20 ring-1 ring-inset ring-[#9dbaf6] dark:ring-blue-400/40 shadow-[0_0_0_1px_rgba(59,130,246,0.06)]'
                     : isInvalidDropTarget
                         ? 'bg-red-500/6 ring-1 ring-inset ring-red-500/35'
                         : isSelected
-                    ? 'bg-[#dce9ff] text-[#173b87] ring-1 ring-inset ring-[#b7cdfa]'
-                    : 'hover:bg-white/80 text-slate-700'
+                    ? 'bg-[#dce9ff] dark:bg-blue-500/20 text-[#173b87] dark:text-blue-200 ring-1 ring-inset ring-[#b7cdfa] dark:ring-blue-400/40'
+                    : 'hover:bg-white/80 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300'
                     } ${isDragged ? 'opacity-45 scale-[0.985]' : ''}`}
-                style={{ paddingLeft: `${indent + 8}px` }}
             >
+                <span className="shrink-0" style={{ width: `${indent + 8}px` }} />
                 {entry.isDirectory && (
                     <svg
-                        className={`w-3 h-3 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''} ${isSelected ? 'text-[#315fca]' : 'text-slate-400'
+                        className={`w-3 h-3 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''} ${isSelected ? 'text-[#315fca] dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'
                             }`}
                         fill="currentColor"
                         viewBox="0 0 20 20"
@@ -236,8 +276,8 @@ export const FileTreeItem = memo(function FileTreeItem({
                         <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                     </svg>
                 )}
-                {!entry.isDirectory && <span className="w-3" />}
-                <span className={`flex-shrink-0 ${isSelected ? 'opacity-100 text-[#315fca]' : 'opacity-70 text-slate-400'}`}>
+                {!entry.isDirectory && <span className="w-3 h-3 shrink-0" />}
+                <span className={`flex-shrink-0 ${isSelected ? 'opacity-100 text-[#315fca] dark:text-blue-300' : 'opacity-70 text-slate-400 dark:text-slate-500'}`}>
                     {entry.isDirectory ? <IconFolder className="h-4 w-4" /> : <IconDocument className="h-4 w-4" />}
                 </span>
                 {isRenaming ? (
@@ -303,7 +343,7 @@ export const FileTreeItem = memo(function FileTreeItem({
             {/* macOS 风格的右键菜单 - 更紧凑 */}
             {contextMenu && contextMenu.path === fullPath && (
                 <div
-                    className="fixed z-50 overflow-hidden rounded-[12px] border border-slate-200/80 bg-white/96 shadow-[0_12px_28px_rgba(15,23,42,0.12)] backdrop-blur-xl animate-scale-in origin-top-left"
+                    className="fixed z-50 overflow-hidden rounded-[12px] border border-slate-200/80 dark:border-slate-700/80 bg-white/96 dark:bg-slate-800/96 shadow-[0_12px_28px_rgba(15,23,42,0.12)] backdrop-blur-xl animate-scale-in origin-top-left"
                     style={{
                         top: `${Math.min(contextMenu.y, window.innerHeight - 100)}px`,
                         left: `${contextMenu.x}px`,
@@ -317,7 +357,7 @@ export const FileTreeItem = memo(function FileTreeItem({
                                     onStartInlineCreate(fullPath, 'file');
                                     setContextMenu(null);
                                 }}
-                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-medium text-slate-700 transition-colors hover:bg-[#edf3ff]"
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-medium text-slate-700 dark:text-slate-200 transition-colors hover:bg-[#edf3ff] dark:hover:bg-slate-700/50"
                             >
                                 <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -329,14 +369,14 @@ export const FileTreeItem = memo(function FileTreeItem({
                                     onStartInlineCreate(fullPath, 'folder');
                                     setContextMenu(null);
                                 }}
-                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-medium text-slate-700 transition-colors hover:bg-[#edf3ff]"
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-medium text-slate-700 dark:text-slate-200 transition-colors hover:bg-[#edf3ff] dark:hover:bg-slate-700/50"
                             >
                                 <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7a2 2 0 012-2h3l2 2h9a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V7z" />
                                 </svg>
                                 <span>New Folder</span>
                             </button>
-                            <div className="mx-2 my-1 h-px bg-slate-200/80" />
+                            <div className="mx-2 my-1 h-px bg-slate-200/80 dark:bg-slate-700/80" />
                         </>
                     )}
                     <button
@@ -381,7 +421,7 @@ export const FileTreeItem = memo(function FileTreeItem({
                             onDeleteEntry(fullPath, e);
                             setContextMenu(null);
                         }}
-                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-medium text-red-600 transition-colors hover:bg-[#fff1f1]"
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-medium text-red-600 dark:text-red-400 transition-colors hover:bg-[#fff1f1] dark:hover:bg-red-500/10"
                     >
                         <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3H4v2h16V7h-3z" />
@@ -394,7 +434,8 @@ export const FileTreeItem = memo(function FileTreeItem({
             {entry.isDirectory && isExpanded && (
                 <div>
                     {isLoading ? (
-                        <div className="px-2 py-1 text-[10px] text-slate-400" style={{ paddingLeft: `${indent + 24}px` }}>
+                        <div className="w-full px-2 py-1 text-[10px] text-slate-400">
+                            <span className="inline-block" style={{ width: `${indent + 24}px` }} />
                             Loading…
                         </div>
                     ) : (
@@ -402,7 +443,8 @@ export const FileTreeItem = memo(function FileTreeItem({
                             <FileTreeItem
                                 key={child.path || `${fullPath}/${child.name}`}
                                 entry={child}
-                                basePath={fullPath}
+                                basePath={getParentPath(resolveEntryPath(child, fullPath))}
+                                rootPath={rootPath}
                                 level={level + 1}
                                 currentFilePath={currentFilePath}
                                 selectedSidebarPath={selectedSidebarPath}

@@ -82,15 +82,15 @@ export default function PreferencesWindow() {
   }, [appWindow]);
 
   return (
-    <div className="min-h-screen bg-[#f3f4f6] text-slate-900">
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-6 pb-8 pt-6">
-        <header className="mb-6 border-b border-[rgba(15,23,42,0.08)] pb-4">
-          <div className="text-[24px] font-semibold tracking-[-0.02em] text-slate-900">Settings</div>
+    <div className="h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] text-slate-900">
+      <div className="mx-auto flex h-full max-w-6xl flex-col px-4 pb-4 pt-4 md:px-6">
+        <header className="mb-4 rounded-[20px] border border-[rgba(15,23,42,0.08)] bg-white/88 px-5 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur-xl">
+          <div className="text-[22px] font-semibold tracking-[-0.02em] text-slate-900">Settings</div>
           <p className="mt-1 text-[12px] text-slate-500">Application-wide preferences for writing, appearance, and files.</p>
         </header>
 
-        <main className="grid flex-1 gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
-          <aside className="rounded-[18px] border border-[rgba(15,23,42,0.08)] bg-white/86 p-3 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+        <main className="grid min-h-0 flex-1 gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
+          <aside className="rounded-[18px] border border-[rgba(15,23,42,0.08)] bg-white/88 p-3 shadow-[0_10px_24px_rgba(15,23,42,0.04)] backdrop-blur-xl">
             <div className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
               Preferences
             </div>
@@ -113,119 +113,121 @@ export default function PreferencesWindow() {
             </div>
           </aside>
 
-          <div className="space-y-5">
-          <PreferenceSection
-            id="appearance"
-            title="Appearance"
-            description={PREFERENCE_SECTIONS[0].description}
-          >
-            <PreferenceRow
-              label="Appearance"
-              hint="Choose the app-wide color appearance."
-              control={(
-                <select
-                  value={isDarkMode ? 'dark' : 'light'}
-                  onChange={(event) => setIsDarkMode(event.target.value === 'dark')}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 outline-none transition focus:border-blue-400"
-                >
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                </select>
-              )}
-            />
-            <PreferenceRow
-              label="Text Size"
-              hint="Affects both the editor and preview."
-              control={(
-                <select
-                  value={fontIndex}
-                  onChange={(event) => setFontIndex(Number(event.target.value))}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 outline-none transition focus:border-blue-400"
-                >
-                  {FONT_OPTIONS.map((option, index) => (
-                    <option key={option.label} value={index}>{option.name}</option>
-                  ))}
-                </select>
-              )}
-            />
-            <PreferenceRow
-              label="Font Family"
-              hint="Choose the default writing font."
-              control={(
-                <select
-                  value={fontFamilyIndex}
-                  onChange={(event) => setFontFamilyIndex(Number(event.target.value))}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 outline-none transition focus:border-blue-400"
-                >
-                  {FONT_FAMILIES.map((option, index) => (
-                    <option key={option.name} value={index}>{option.nameZh}</option>
-                  ))}
-                </select>
-              )}
-            />
-            <PreferenceRow
-              label="Reading Background"
-              hint="Set the default paper tint used in the workspace."
-              control={(
-                <div className="grid grid-cols-2 gap-2">
-                  {BACKGROUND_COLORS.map((option, index) => (
-                    <button
-                      key={option.name}
-                      type="button"
-                      onClick={() => setBgColorIndex(index)}
-                      className={`rounded-2xl border px-3 py-2 text-left transition ${
-                        bgColorIndex === index ? 'border-blue-400 ring-2 ring-blue-400/20' : 'border-slate-200'
-                      }`}
-                      style={{ backgroundColor: option.bg, color: option.text }}
+          <div className="min-h-0 overflow-y-auto pr-1">
+            <div className="space-y-5 pb-4">
+              <PreferenceSection
+                id="appearance"
+                title="Appearance"
+                description={PREFERENCE_SECTIONS[0].description}
+              >
+                <PreferenceRow
+                  label="Appearance"
+                  hint="Choose the app-wide color appearance."
+                  control={(
+                    <select
+                      value={isDarkMode ? 'dark' : 'light'}
+                      onChange={(event) => setIsDarkMode(event.target.value === 'dark')}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 outline-none transition focus:border-blue-400"
                     >
-                      <div className="text-[11px] font-semibold">{option.name}</div>
-                      <div className="mt-1 text-[10px] opacity-70">{option.description}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            />
-          </PreferenceSection>
-
-          <PreferenceSection
-            id="files"
-            title="Files"
-            description={PREFERENCE_SECTIONS[1].description}
-          >
-            <PreferenceRow
-              label="Attachment Folder"
-              hint="Used for Obsidian-style image references."
-              control={(
-                <input
-                  type="text"
-                  value={attachmentFolder}
-                  onChange={(event) => setAttachmentFolder(event.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 outline-none transition focus:border-blue-400"
-                  placeholder="00- Attachment"
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                    </select>
+                  )}
                 />
-              )}
-            />
-            <PreferenceRow
-              label="Sort Files By"
-              hint="Applies to the sidebar explorer."
-              control={(
-                <select
-                  value={fileSortBy}
-                  onChange={(event) => setFileSortBy(event.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 outline-none transition focus:border-blue-400"
-                >
-                  <option value="name">Name</option>
-                  <option value="type">Type</option>
-                  <option value="modified">Modified Time</option>
-                </select>
-              )}
-            />
-            <PreferenceRow
-              label="Auto Save"
-              hint="Persist changes automatically after editing named documents."
-              control={<Toggle checked={autoSaveEnabled} onChange={setAutoSaveEnabled} />}
-            />
-          </PreferenceSection>
+                <PreferenceRow
+                  label="Text Size"
+                  hint="Affects both the editor and preview."
+                  control={(
+                    <select
+                      value={fontIndex}
+                      onChange={(event) => setFontIndex(Number(event.target.value))}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 outline-none transition focus:border-blue-400"
+                    >
+                      {FONT_OPTIONS.map((option, index) => (
+                        <option key={option.label} value={index}>{option.name}</option>
+                      ))}
+                    </select>
+                  )}
+                />
+                <PreferenceRow
+                  label="Font Family"
+                  hint="Choose the default writing font."
+                  control={(
+                    <select
+                      value={fontFamilyIndex}
+                      onChange={(event) => setFontFamilyIndex(Number(event.target.value))}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 outline-none transition focus:border-blue-400"
+                    >
+                      {FONT_FAMILIES.map((option, index) => (
+                        <option key={option.name} value={index}>{option.nameZh}</option>
+                      ))}
+                    </select>
+                  )}
+                />
+                <PreferenceRow
+                  label="Reading Background"
+                  hint="Set the default paper tint used in the workspace."
+                  control={(
+                    <div className="grid grid-cols-2 gap-2">
+                      {BACKGROUND_COLORS.map((option, index) => (
+                        <button
+                          key={option.name}
+                          type="button"
+                          onClick={() => setBgColorIndex(index)}
+                          className={`rounded-2xl border px-3 py-2 text-left transition ${
+                            bgColorIndex === index ? 'border-blue-400 ring-2 ring-blue-400/20' : 'border-slate-200'
+                          }`}
+                          style={{ backgroundColor: option.bg, color: option.text }}
+                        >
+                          <div className="text-[11px] font-semibold">{option.name}</div>
+                          <div className="mt-1 text-[10px] opacity-70">{option.description}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                />
+              </PreferenceSection>
+
+              <PreferenceSection
+                id="files"
+                title="Files"
+                description={PREFERENCE_SECTIONS[1].description}
+              >
+                <PreferenceRow
+                  label="Attachment Folder"
+                  hint="Used for Obsidian-style image references."
+                  control={(
+                    <input
+                      type="text"
+                      value={attachmentFolder}
+                      onChange={(event) => setAttachmentFolder(event.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 outline-none transition focus:border-blue-400"
+                      placeholder="00- Attachment"
+                    />
+                  )}
+                />
+                <PreferenceRow
+                  label="Sort Files By"
+                  hint="Applies to the sidebar explorer."
+                  control={(
+                    <select
+                      value={fileSortBy}
+                      onChange={(event) => setFileSortBy(event.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 outline-none transition focus:border-blue-400"
+                    >
+                      <option value="name">Name</option>
+                      <option value="type">Type</option>
+                      <option value="modified">Modified Time</option>
+                    </select>
+                  )}
+                />
+                <PreferenceRow
+                  label="Auto Save"
+                  hint="Persist changes automatically after editing named documents."
+                  control={<Toggle checked={autoSaveEnabled} onChange={setAutoSaveEnabled} />}
+                />
+              </PreferenceSection>
+            </div>
           </div>
         </main>
       </div>

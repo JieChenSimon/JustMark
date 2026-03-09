@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { FileTreeItem, InlineCreateRow } from './FileTreeItem';
 
 export default function SidebarPanel({
@@ -37,6 +38,26 @@ export default function SidebarPanel({
   setSidebarRef,
   sidebarWidth,
 }) {
+  useEffect(() => {
+    const shouldDebug = import.meta.env.DEV && (
+      currentFolder?.includes('SimonChen') ||
+      folderContents.some((entry) => /00- 雅思-口语|Hu et al\.|面签英语/.test(entry.path || entry.name || ''))
+    );
+
+    if (!shouldDebug) {
+      return;
+    }
+
+    console.groupCollapsed('[tree-root] SidebarPanel');
+    console.log('currentFolder', currentFolder);
+    console.table(folderContents.map((entry) => ({
+      name: entry.name,
+      path: entry.path,
+      isDirectory: entry.isDirectory,
+    })));
+    console.groupEnd();
+  }, [currentFolder, folderContents]);
+
   if (!currentFolder) {
     return null;
   }
@@ -54,8 +75,7 @@ export default function SidebarPanel({
     >
       <div className="p-3 relative">
         <div className="mb-3 px-2">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Workspace</div>
-          <div className="mt-1 truncate text-[13px] font-semibold text-slate-800">{currentFolder.split('/').pop()}</div>
+          <div className="truncate text-[13px] font-semibold text-slate-800 dark:text-slate-200">{currentFolder.split('/').pop()}</div>
         </div>
         {draggedPath && rootDropActive && (
           <div className="sticky top-2 z-20 mb-2 rounded-xl border border-blue-500/30 dark:border-blue-400/30 bg-white/80 dark:bg-slate-900/70 backdrop-blur-xl px-3 py-2 shadow-[0_12px_30px_rgba(15,23,42,0.14)]">
@@ -84,6 +104,7 @@ export default function SidebarPanel({
             key={entry.path}
             entry={entry}
             basePath={currentFolder}
+            rootPath={currentFolder}
             level={0}
             currentFilePath={currentFilePath}
             selectedSidebarPath={selectedSidebarPath}

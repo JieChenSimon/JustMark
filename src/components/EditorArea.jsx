@@ -12,6 +12,7 @@ const EditorArea = forwardRef(({
   onMarkdownChange,
   currentFont,
   currentFontFamily,
+  appBgColor,
   appTextColor,
   currentFolder,
   currentFilePath,
@@ -20,7 +21,10 @@ const EditorArea = forwardRef(({
   onEditorScroll,
   previewVisible,
   onTogglePreview,
-  onImagePasted
+  onImagePasted,
+  chars,
+  words,
+  lines
 }, ref) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const textareaRef = useRef(null);
@@ -153,23 +157,13 @@ const EditorArea = forwardRef(({
   }, [searchOpen]);
 
   return (
-    <div className="jm-editor-surface flex-1 relative flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-2.5 border-b border-slate-200/70 bg-[rgba(248,249,251,0.82)] backdrop-blur-xl">
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Editor</div>
-          <div className="mt-1 flex items-center gap-2 text-[13px] font-semibold text-slate-800">
-            <IconDocument className="h-4 w-4 text-slate-400" />
-            <span>{currentFilePath ? currentFilePath.split('/').pop() : 'Untitled.md'}</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 text-[11px] text-slate-500">
-          <span className="rounded-[9px] border border-slate-200/80 bg-white/85 px-2 py-1">Markdown</span>
-          <span className="rounded-[9px] border border-slate-200/80 bg-white/85 px-2 py-1">{currentFont.name}</span>
-        </div>
-      </div>
+    <div
+      className="jm-editor-surface relative flex h-full min-h-0 flex-1 flex-col overflow-hidden"
+      style={{ backgroundColor: appBgColor }}
+    >
       <textarea
         ref={textareaRef}
-        className={`flex-1 px-8 pb-8 pt-10 outline-none resize-none bg-transparent placeholder-gray-300 dark:placeholder-gray-600 ${currentFont.size} ${currentFont.leading}`}
+        className={`min-h-0 flex-1 resize-none bg-transparent px-8 pb-24 pt-8 outline-none placeholder-gray-300 dark:placeholder-gray-600 ${currentFont.size} ${currentFont.leading}`}
         style={{
           fontFamily: currentFontFamily.family,
           color: appTextColor
@@ -197,43 +191,36 @@ const EditorArea = forwardRef(({
         textareaRef={textareaRef}
       />
 
-      {/* 左下角：侧边栏导航按钮和文件名 */}
-      <div className="absolute bottom-5 left-5 flex items-end gap-2 z-20">
-        {/* 侧边栏导航按钮组 - 只在有文件夹时显示 */}
+      {/* 左下角：侧边栏导航按钮和状态信息 */}
+      <div className="absolute bottom-4 left-4 flex items-center gap-1.5 z-20 group">
+        <button
+          onClick={onTogglePreview}
+          className={`w-7 h-7 flex items-center justify-center rounded-lg backdrop-blur-md transition-all duration-200 ${previewVisible
+            ? 'bg-black/90 dark:bg-white/90'
+            : 'bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10'
+            }`}
+          title={previewVisible ? 'Hide Preview' : 'Show Preview'}
+        >
+          <IconPreview className={`w-3.5 h-3.5 ${previewVisible ? 'text-white dark:text-black' : 'text-black/60 dark:text-white/60'}`} />
+        </button>
+
         {currentFolder && (
-          <div className="flex flex-col gap-1">
-            {/* 预览切换按钮 */}
-            <button
-              onClick={onTogglePreview}
-              className={`w-9 h-9 flex items-center justify-center rounded-[12px] backdrop-blur-xl shadow-sm transition-all active:scale-95 ${previewVisible
-                ? 'bg-[#dce9ff] border border-[#b7cdfa]'
-                : 'bg-white/88 hover:bg-white border border-slate-200/80'
-                }`}
-              title={previewVisible ? 'Hide Preview' : 'Show Preview'}
-            >
-              <IconPreview className={`w-4 h-4 ${previewVisible ? 'text-[#2d5bd1]' : 'text-slate-600'}`} />
-            </button>
-
-            {/* File Browser Button */}
-            <button
-              onClick={() => onToggleSidebar(!sidebarVisible)}
-              className={`w-9 h-9 flex items-center justify-center rounded-[12px] backdrop-blur-xl shadow-sm transition-all active:scale-95 ${sidebarVisible
-                ? 'bg-[#dce9ff] border border-[#b7cdfa]'
-                : 'bg-white/88 hover:bg-white border border-slate-200/80'
-                }`}
-              title={sidebarVisible ? 'Hide Explorer' : 'Show Explorer'}
-            >
-              <IconSidebar className={`w-4 h-4 ${sidebarVisible ? 'text-[#2d5bd1]' : 'text-slate-600'}`} />
-            </button>
-          </div>
+          <button
+            onClick={() => onToggleSidebar(!sidebarVisible)}
+            className={`w-7 h-7 flex items-center justify-center rounded-lg backdrop-blur-md transition-all duration-200 ${sidebarVisible
+              ? 'bg-black/90 dark:bg-white/90'
+              : 'bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10'
+              }`}
+            title={sidebarVisible ? 'Hide Explorer' : 'Show Explorer'}
+          >
+            <IconSidebar className={`w-3.5 h-3.5 ${sidebarVisible ? 'text-white dark:text-black' : 'text-black/60 dark:text-white/60'}`} />
+          </button>
         )}
 
-        {/* 文件名显示 */}
-        {currentFilePath && (
-          <span className="mb-0.5 rounded-[10px] border border-slate-200/80 bg-white/88 px-2.5 py-1 text-[10px] text-slate-500 backdrop-blur-xl shadow-sm">
-            {currentFilePath.split('/').pop()}
-          </span>
-        )}
+        {/* 状态信息 - hover 时显示 */}
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 ml-1 px-2 py-1 rounded-lg bg-black/5 dark:bg-white/5 backdrop-blur-md text-[9px] text-black/50 dark:text-white/50 tabular-nums whitespace-nowrap">
+          {chars.toLocaleString()} · {words.toLocaleString()}w · {lines.toLocaleString()}L
+        </div>
       </div>
     </div>
   );

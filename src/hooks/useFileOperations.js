@@ -1,5 +1,5 @@
-import { useCallback } from 'react';
-import { save, open } from '@tauri-apps/plugin-dialog';
+import { useCallback, useEffect, useRef } from 'react';
+import { save, open as openDialog } from '@tauri-apps/plugin-dialog';
 import { writeTextFile, readTextFile, readDir, remove, mkdir, rename, exists, copyFile } from '@tauri-apps/plugin-fs';
 import { getCachedFileTree, invalidateCache } from '../utils/fileCache';
 
@@ -27,6 +27,7 @@ export const useFileOperations = ({
   addRecentFile,
   setCurrentFolder,
   setFolderContents,
+  setPreviewFilePath,
   setExpandedFolders,
   sortEntries,
   parseTags,
@@ -34,6 +35,28 @@ export const useFileOperations = ({
   onPersistMarkdown,
   getTagColor
 }) => {
+  const isMountedRef = useRef(true);
+  const folderLoadRequestRef = useRef(0);
+  const fileOpenRequestRef = useRef(0);
+  const tagScanRequestRef = useRef(0);
+  const tagScanTimerRef = useRef(null);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+      tagScanRequestRef.current += 1;
+
+      if (tagScanTimerRef.current) {
+        clearTimeout(tagScanTimerRef.current);
+        tagScanTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const isEditableTextPath = useCallback((path) => /\.(md|markdown|txt)$/i.test(path || ''), []);
+
   const getParentPath = useCallback((path) => {
     const lastSlashIndex = path.lastIndexOf('/');
     return lastSlashIndex >= 0 ? path.slice(0, lastSlashIndex) : '';
@@ -68,11 +91,15 @@ export const useFileOperations = ({
     setHasUnsavedChanges(false);
   }, [onPersistMarkdown, setCurrentFilePath, setHasUnsavedChanges, setMarkdown]);
 
-  const scanTagsForEntries = useCallback(async (entries) => {
+  const scanTagsForEntries = useCallback(async (entries, requestId) => {
     const mdFiles = entries.filter((item) => !item.isDirectory && item.name?.endsWith('.md'));
     const batchSize = 10;
 
     for (let i = 0; i < mdFiles.length; i += batchSize) {
+      if (!isMountedRef.current || requestId !== tagScanRequestRef.current) {
+        return;
+      }
+
       const batch = mdFiles.slice(i, i + batchSize);
       const results = await Promise.all(
         batch.map(async (file) => {
@@ -85,6 +112,10 @@ export const useFileOperations = ({
           }
         })
       );
+
+      if (!isMountedRef.current || requestId !== tagScanRequestRef.current) {
+        return;
+      }
 
       setFileTags((prev) => {
         const next = { ...prev };
@@ -102,7 +133,14 @@ export const useFileOperations = ({
 
   const loadFolderContents = useCallback(async (folderPath, options = {}) => {
     const { preserveExpanded = false } = options;
+    const requestId = folderLoadRequestRef.current + 1;
+    folderLoadRequestRef.current = requestId;
+
     const entries = await getCachedFileTree(folderPath, readDir);
+
+    if (!isMountedRef.current || requestId !== folderLoadRequestRef.current) {
+      return;
+    }
 
     setCurrentFolder(folderPath);
     setFolderContents(sortEntries(entries));
@@ -116,8 +154,19 @@ export const useFileOperations = ({
       return next;
     });
 
-    setTimeout(() => {
-      void scanTagsForEntries(entries);
+    tagScanRequestRef.current += 1;
+    const tagRequestId = tagScanRequestRef.current;
+
+    if (tagScanTimerRef.current) {
+      clearTimeout(tagScanTimerRef.current);
+    }
+
+    tagScanTimerRef.current = setTimeout(() => {
+      if (!isMountedRef.current || requestId !== folderLoadRequestRef.current || tagRequestId !== tagScanRequestRef.current) {
+        return;
+      }
+
+      void scanTagsForEntries(entries, tagRequestId);
     }, 100);
   }, [scanTagsForEntries, setCurrentFolder, setExpandedFolders, setFolderContents, sortEntries]);
 
@@ -133,7 +182,36 @@ export const useFileOperations = ({
 
   const openFileInEditor = useCallback(async (filePath, options = {}) => {
     const { revealInSidebar = true } = options;
+    const requestId = fileOpenRequestRef.current + 1;
+    fileOpenRequestRef.current = requestId;
+
+    if (!isEditableTextPath(filePath)) {
+      if (!isMountedRef.current || requestId !== fileOpenRequestRef.current) {
+        return;
+      }
+
+      setPreviewFilePath(filePath);
+      setCurrentFilePath(filePath);
+      setMarkdown('');
+      onPersistMarkdown('');
+      setHasUnsavedChanges(false);
+      addRecentFile(filePath);
+
+      if (revealInSidebar) {
+        const folderPath = getParentPath(filePath);
+        if (folderPath) {
+          await loadFolderContents(folderPath, { preserveExpanded: true });
+        }
+      }
+      return;
+    }
+
+    setPreviewFilePath(null);
     const content = await readTextFile(filePath);
+
+    if (!isMountedRef.current || requestId !== fileOpenRequestRef.current) {
+      return;
+    }
 
     setMarkdown(content);
     onPersistMarkdown(content);
@@ -150,25 +228,27 @@ export const useFileOperations = ({
   }, [
     addRecentFile,
     getParentPath,
+    isEditableTextPath,
     loadFolderContents,
     onPersistMarkdown,
     setCurrentFilePath,
     setHasUnsavedChanges,
-    setMarkdown
+    setMarkdown,
+    setPreviewFilePath
   ]);
 
   const handleSave = useCallback(async () => {
-    if (!currentFilePath) return false;
+    if (!currentFilePath || !isEditableTextPath(currentFilePath)) return false;
 
     await writeTextFile(currentFilePath, markdown);
     onPersistMarkdown(markdown);
     setHasUnsavedChanges(false);
     return true;
-  }, [currentFilePath, markdown, onPersistMarkdown, setHasUnsavedChanges]);
+  }, [currentFilePath, isEditableTextPath, markdown, onPersistMarkdown, setHasUnsavedChanges]);
 
   const handleSaveAs = useCallback(async () => {
     const filePath = await save({
-      defaultPath: currentFilePath || 'untitled.md',
+      defaultPath: isEditableTextPath(currentFilePath) ? currentFilePath : 'untitled.md',
       filters: [{ name: 'Markdown', extensions: ['md'] }]
     });
     if (!filePath) return null;
@@ -192,12 +272,13 @@ export const useFileOperations = ({
     loadFolderContents,
     markdown,
     onPersistMarkdown,
+    isEditableTextPath,
     setCurrentFilePath,
     setHasUnsavedChanges
   ]);
 
   const handleOpenFile = useCallback(async () => {
-    const selected = await open({
+    const selected = await openDialog({
       multiple: false,
       filters: [{ name: 'Markdown', extensions: ['md', 'markdown', 'txt'] }]
     });
@@ -208,7 +289,7 @@ export const useFileOperations = ({
   }, [openFileInEditor]);
 
   const handleOpenFolder = useCallback(async () => {
-    const selected = await open({ directory: true, multiple: false });
+    const selected = await openDialog({ directory: true, multiple: false });
 
     if (selected) {
       await loadFolderContents(selected);

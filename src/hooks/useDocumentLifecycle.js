@@ -15,12 +15,14 @@ export function useDocumentLifecycle({
   savedMarkdownRef,
   setHasUnsavedChanges,
 }) {
-  useEffect(() => {
-    setHasUnsavedChanges(markdown !== savedMarkdownRef.current);
-  }, [markdown, savedMarkdownRef, setHasUnsavedChanges]);
+  const isEditableTextPath = (path) => !path || /\.(md|markdown|txt)$/i.test(path);
 
   useEffect(() => {
-    if (!autoSaveEnabled || !hasUnsavedChanges || !currentFilePath) return undefined;
+    setHasUnsavedChanges(isEditableTextPath(currentFilePath) && markdown !== savedMarkdownRef.current);
+  }, [currentFilePath, markdown, savedMarkdownRef, setHasUnsavedChanges]);
+
+  useEffect(() => {
+    if (!autoSaveEnabled || !hasUnsavedChanges || !currentFilePath || !isEditableTextPath(currentFilePath)) return undefined;
 
     const timer = setTimeout(() => {
       void fileOps.handleSave();

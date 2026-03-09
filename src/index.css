@@ -4,15 +4,15 @@
 
 @layer base {
   :root {
-    --jm-window-bg: #edf1f5;
-    --jm-text: #111827;
-    --jm-muted: #667085;
+    --jm-window-bg: #f5f5f5;
+    --jm-text: #1a1a1a;
+    --jm-muted: #6b6b6b;
     --jm-accent: #2563eb;
-    --jm-accent-soft: rgba(37, 99, 235, 0.1);
-    --jm-panel: rgba(255, 255, 255, 0.72);
-    --jm-panel-strong: rgba(255, 255, 255, 0.88);
-    --jm-panel-border: rgba(15, 23, 42, 0.08);
-    --jm-panel-shadow: 0 18px 46px rgba(15, 23, 42, 0.1);
+    --jm-accent-soft: rgba(37, 99, 235, 0.08);
+    --jm-panel: rgba(255, 255, 255, 0.85);
+    --jm-panel-strong: rgba(255, 255, 255, 0.95);
+    --jm-panel-border: rgba(0, 0, 0, 0.06);
+    --jm-panel-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   }
 
   html,
@@ -26,63 +26,61 @@
     width: 100vw;
     overflow: hidden;
     color: var(--jm-text);
-    font-family: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
-    background:
-      radial-gradient(circle at top left, rgba(255, 255, 255, 0.98), transparent 30%),
-      linear-gradient(180deg, #f8f9fb 0%, var(--jm-window-bg) 100%);
+    background: var(--jm-window-bg);
+  }
+
+  body.dragging,
+  body.dragging * {
+    cursor: col-resize !important;
+    user-select: none !important;
   }
 }
 
 @layer components {
   .jm-window {
-    @apply h-screen w-screen overflow-hidden p-2.5;
+    @apply h-screen w-screen overflow-hidden;
   }
 
   .jm-shell {
-    @apply flex h-full flex-col overflow-hidden rounded-[18px];
-    background: linear-gradient(180deg, rgba(255,255,255,0.78) 0%, rgba(246,248,251,0.86) 100%);
-    border: 1px solid rgba(15, 23, 42, 0.06);
-    box-shadow: 0 18px 46px rgba(15, 23, 42, 0.1);
-    backdrop-filter: blur(22px);
+    @apply flex h-full flex-col overflow-hidden;
+    background: var(--jm-window-bg);
   }
 
   .jm-toolbar {
-    @apply flex items-center gap-3 px-4 py-2.5;
-    background: rgba(248, 249, 251, 0.72);
-    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-    backdrop-filter: blur(18px);
+    @apply flex items-center gap-3 px-4 py-3;
+    background: rgba(255, 255, 255, 0.98);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    backdrop-filter: blur(20px);
   }
 
   .jm-toolbar-group {
-    @apply flex items-center gap-1 rounded-[12px] px-1.5 py-1;
-    background: rgba(255, 255, 255, 0.54);
-    border: 1px solid rgba(15, 23, 42, 0.045);
+    @apply flex items-center gap-1 rounded-lg px-1.5 py-1;
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(0, 0, 0, 0.06);
   }
 
   .jm-button {
-    @apply inline-flex items-center justify-center rounded-[10px] px-2.5 py-1.5 text-[12px] font-medium transition-all duration-150;
+    @apply inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all duration-150;
     background: transparent;
-    border: 1px solid transparent;
-    box-shadow: none;
+    border: none;
     color: var(--jm-text);
   }
 
   .jm-button:hover {
-    background: rgba(15, 23, 42, 0.055);
-    border-color: rgba(15, 23, 42, 0.05);
+    background: rgba(0, 0, 0, 0.05);
   }
 
   .jm-button:active {
-    background: rgba(15, 23, 42, 0.08);
-    transform: translateY(0.5px);
+    background: rgba(0, 0, 0, 0.08);
+    transform: scale(0.98);
   }
 
   .jm-button-primary {
-    background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(244,246,248,0.94) 100%);
-    border: 1px solid rgba(15, 23, 42, 0.07);
-    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255,255,255,0.6);
+    background: rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.08);
   }
 
   .jm-button-accent {
@@ -92,9 +90,8 @@
   }
 
   .jm-title-badge {
-    @apply inline-flex items-center gap-2 rounded-[14px] px-3 py-1.5 text-[12px];
-    background: rgba(255, 255, 255, 0.56);
-    border: 1px solid rgba(15, 23, 42, 0.045);
+    @apply inline-flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px];
+    background: transparent;
   }
 
   .jm-panel {
@@ -105,23 +102,27 @@
   }
 
   .jm-editor-surface {
-    @apply rounded-[18px];
-    background: linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(249,250,251,0.98) 100%);
-    border: 1px solid rgba(15, 23, 42, 0.06);
-    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+    @apply rounded-xl;
+    background: white;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    transition: box-shadow 0.2s ease;
+  }
+
+  .jm-editor-surface:focus-within {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   }
 
   .jm-preview-surface {
-    @apply rounded-[18px];
-    background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.97) 100%);
-    border: 1px solid rgba(15, 23, 42, 0.06);
-    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.07);
+    @apply rounded-xl;
+    background: white;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   }
 
   .jm-statusbar {
-    background: rgba(248, 249, 251, 0.72);
-    border-top: 1px solid rgba(15, 23, 42, 0.06);
-    backdrop-filter: blur(18px);
+    background: transparent;
+    border-top: none;
   }
 
   .jm-traffic-lights {
@@ -132,6 +133,278 @@
     @apply h-3 w-3 rounded-full;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), 0 0 0 0.5px rgba(15,23,42,0.12);
   }
+}
+
+.dark {
+  --jm-window-bg: #1a1a1a;
+  --jm-text: #e5e5e5;
+  --jm-muted: #a3a3a3;
+  --jm-accent: #60a5fa;
+  --jm-accent-soft: rgba(96, 165, 250, 0.12);
+  --jm-panel: rgba(38, 38, 38, 0.85);
+  --jm-panel-strong: rgba(38, 38, 38, 0.95);
+  --jm-panel-border: rgba(255, 255, 255, 0.1);
+  --jm-panel-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.dark .jm-shell {
+  background: #1a1a1a;
+}
+
+.dark .jm-toolbar {
+  background: rgba(38, 38, 38, 0.98);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark .jm-toolbar-group {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .jm-button {
+  color: #e5e5e5;
+}
+
+.dark .jm-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dark .jm-button-primary {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.dark .jm-editor-surface,
+.dark .jm-preview-surface {
+  background: #262626;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.dark .jm-statusbar {
+  background: transparent;
+  border-top: none;
+}
+
+.jm-preview-scroll {
+  scrollbar-gutter: stable;
+}
+
+.jm-markdown-preview {
+  line-height: 1.75;
+}
+
+.jm-markdown-preview > :first-child {
+  margin-top: 0;
+}
+
+.jm-markdown-preview h1,
+.jm-markdown-preview h2,
+.jm-markdown-preview h3,
+.jm-markdown-preview h4,
+.jm-markdown-preview h5,
+.jm-markdown-preview h6 {
+  color: inherit;
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: 0.6em;
+}
+
+.jm-markdown-preview h1 {
+  font-size: 2em;
+  margin-top: 0;
+}
+
+.jm-markdown-preview h2 {
+  font-size: 1.55em;
+  margin-top: 1.6em;
+}
+
+.jm-markdown-preview h3 {
+  font-size: 1.25em;
+  margin-top: 1.4em;
+}
+
+.jm-markdown-preview h4,
+.jm-markdown-preview h5,
+.jm-markdown-preview h6 {
+  font-size: 1.05em;
+  margin-top: 1.2em;
+}
+
+.jm-markdown-preview p,
+.jm-markdown-preview ul,
+.jm-markdown-preview ol,
+.jm-markdown-preview blockquote,
+.jm-markdown-preview pre,
+.jm-markdown-preview table {
+  margin: 0 0 1em;
+}
+
+.jm-markdown-preview ul,
+.jm-markdown-preview ol {
+  padding-left: 1.4em;
+}
+
+.jm-markdown-preview li + li {
+  margin-top: 0.35em;
+}
+
+.jm-markdown-preview a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.jm-markdown-preview a:hover {
+  text-decoration: underline;
+}
+
+.dark .jm-markdown-preview a {
+  color: #60a5fa;
+}
+
+.jm-markdown-preview strong,
+.jm-markdown-preview b,
+.jm-markdown-preview em,
+.jm-markdown-preview i {
+  color: inherit;
+}
+
+.jm-markdown-preview blockquote {
+  border-left: 3px solid rgba(37, 99, 235, 0.28);
+  padding-left: 1em;
+  color: color-mix(in srgb, currentColor 82%, transparent);
+}
+
+.dark .jm-markdown-preview blockquote {
+  border-left-color: rgba(96, 165, 250, 0.4);
+}
+
+.jm-markdown-preview hr {
+  border: 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.3);
+  margin: 1.5em 0;
+}
+
+.dark .jm-markdown-preview hr {
+  border-top-color: rgba(148, 163, 184, 0.2);
+}
+
+.jm-markdown-preview code {
+  font-family: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.jm-markdown-preview :not(pre) > code {
+  background: rgba(148, 163, 184, 0.18);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 6px;
+  color: inherit;
+  font-size: 0.9em;
+  padding: 0.15em 0.4em;
+}
+
+.dark .jm-markdown-preview :not(pre) > code {
+  background: rgba(148, 163, 184, 0.15);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.jm-markdown-preview pre {
+  background: rgba(15, 23, 42, 0.92);
+  border-radius: 14px;
+  color: #e2e8f0;
+  overflow-x: auto;
+  padding: 1em 1.1em;
+}
+
+.jm-markdown-preview pre code {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  padding: 0;
+}
+
+.jm-markdown-preview img {
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  display: block;
+  height: auto;
+  margin: 1.2em auto;
+  max-width: 100%;
+}
+
+.jm-markdown-preview table {
+  border-collapse: collapse;
+  font-size: 0.95em;
+  width: 100%;
+}
+
+.jm-markdown-preview th,
+.jm-markdown-preview td {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  padding: 0.65em 0.8em;
+  text-align: left;
+}
+
+.jm-markdown-preview th {
+  background: rgba(148, 163, 184, 0.12);
+  font-weight: 600;
+}
+
+.dark .jm-markdown-preview th,
+.dark .jm-markdown-preview td {
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.dark .jm-markdown-preview th {
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.jm-markdown-preview .katex,
+.jm-markdown-preview .katex-display {
+  color: inherit;
+}
+
+.jm-pdf-canvas {
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.76), transparent 30%),
+    linear-gradient(180deg, rgba(226, 232, 240, 0.62) 0%, rgba(203, 213, 225, 0.4) 100%);
+  display: flex;
+  height: 100%;
+  justify-content: center;
+  overflow: auto;
+  padding: 24px;
+}
+
+.dark .jm-pdf-canvas {
+  background:
+    radial-gradient(circle at top, rgba(51, 65, 85, 0.68), transparent 30%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.84) 0%, rgba(30, 41, 59, 0.92) 100%);
+}
+
+.jm-pdf-scale-shell {
+  transform-origin: top center;
+  transition: transform 0.2s ease;
+}
+
+.jm-pdf-page {
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.16);
+  color: #0f172a;
+  min-height: 1123px;
+  padding: 72px 78px;
+  width: 794px;
+}
+
+.jm-pdf-page h1 {
+  font-size: 1.8em;
+}
+
+.jm-pdf-page h2 {
+  font-size: 1.35em;
+}
+
+.jm-pdf-page h3 {
+  font-size: 1.15em;
 }
 
 ::-webkit-scrollbar {
@@ -146,6 +419,10 @@
 ::-webkit-scrollbar-thumb {
   background-color: rgba(100, 116, 139, 0.2);
   border-radius: 999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.4);
 }
 
 .a4-paper {
