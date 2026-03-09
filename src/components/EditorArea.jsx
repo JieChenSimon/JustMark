@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import SearchReplace from './SearchReplace';
 import { useImagePaste } from '../hooks/useImagePaste';
-import { IconDocument, IconPreview, IconSidebar } from './icons/AppIcons';
+import { IconDocument, IconSidebar } from './icons/AppIcons';
 
 /**
  * 编辑器区域组件
@@ -190,38 +190,22 @@ const EditorArea = forwardRef(({
         }}
         textareaRef={textareaRef}
       />
-
-      {/* 左下角：侧边栏导航按钮和状态信息 */}
-      <div className="absolute bottom-4 left-4 flex items-center gap-1.5 z-20 group">
-        <button
-          onClick={onTogglePreview}
-          className={`w-7 h-7 flex items-center justify-center rounded-lg backdrop-blur-md transition-all duration-200 ${previewVisible
-            ? 'bg-black/90 dark:bg-white/90'
-            : 'bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10'
-            }`}
-          title={previewVisible ? 'Hide Preview' : 'Show Preview'}
-        >
-          <IconPreview className={`w-3.5 h-3.5 ${previewVisible ? 'text-white dark:text-black' : 'text-black/60 dark:text-white/60'}`} />
-        </button>
-
-        {currentFolder && (
+      {currentFolder && (
+        <div className="absolute bottom-4 left-4 z-20">
           <button
             onClick={() => onToggleSidebar(!sidebarVisible)}
-            className={`w-7 h-7 flex items-center justify-center rounded-lg backdrop-blur-md transition-all duration-200 ${sidebarVisible
-              ? 'bg-black/90 dark:bg-white/90'
-              : 'bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10'
-              }`}
+            className={`flex h-7 w-7 items-center justify-center rounded-lg backdrop-blur-md transition-all duration-200 ${
+              sidebarVisible
+                ? 'bg-black/90 dark:bg-white/90'
+                : 'bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10'
+            }`}
             title={sidebarVisible ? 'Hide Explorer' : 'Show Explorer'}
           >
-            <IconSidebar className={`w-3.5 h-3.5 ${sidebarVisible ? 'text-white dark:text-black' : 'text-black/60 dark:text-white/60'}`} />
+            <IconSidebar className={`h-3.5 w-3.5 ${sidebarVisible ? 'text-white dark:text-black' : 'text-black/60 dark:text-white/60'}`} />
           </button>
-        )}
-
-        {/* 状态信息 - hover 时显示 */}
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 ml-1 px-2 py-1 rounded-lg bg-black/5 dark:bg-white/5 backdrop-blur-md text-[9px] text-black/50 dark:text-white/50 tabular-nums whitespace-nowrap">
-          {chars.toLocaleString()} · {words.toLocaleString()}w · {lines.toLocaleString()}L
         </div>
-      </div>
+      )}
+
     </div>
   );
 });

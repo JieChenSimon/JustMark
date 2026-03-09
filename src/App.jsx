@@ -1,5 +1,5 @@
 /* @refresh reset */
-import { useState, useRef, useDeferredValue, useCallback } from 'react';
+import { useState, useRef, useDeferredValue, useCallback, useMemo } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { useTheme } from './hooks/useTheme';
@@ -18,6 +18,7 @@ import { useDocumentLifecycle } from './hooks/useDocumentLifecycle';
 import { useInlineCreate } from './hooks/useInlineCreate';
 import { useNoticeDialog } from './hooks/useNoticeDialog';
 import { useUnsavedChangesGuard } from './hooks/useUnsavedChangesGuard';
+import { useWebClipper } from './hooks/useWebClipper';
 import EditorArea from './components/EditorArea';
 import MarkdownPreview from './components/preview/MarkdownPreview';
 import PDFPreview from './components/preview/PDFPreview';
@@ -29,6 +30,7 @@ import DragNoticeOverlay from './components/sidebar/DragNoticeOverlay';
 import SidebarPanel from './components/sidebar/SidebarPanel';
 import ConfirmDialog from './components/ConfirmDialog';
 import { parseTags, sortEntries, getTagColor } from './utils/fileHelpers';
+import { createUniqueHeadingId, extractTocHeadings, flattenReactNodeText, getLineStartOffset } from './utils/toc';
 import { bringAllToFront, openDocumentWindow, openPreferencesWindow } from './utils/windows';
 
 function App() {
@@ -70,6 +72,7 @@ function App() {
   const { sidebarWidth, isDraggingSidebar, setIsDraggingSidebar } = useWindowManager();
   const { isExporting, exportToPDF, exportToDOCX } = useExportManager();
   const { width: editorWidth, isDragging, handleMouseDown } = useResizable(50, 30, 70);
+  const { clipFromSelection, isClipping } = useWebClipper();
 
   const [currentFilePath, setCurrentFilePath] = useLocalStorage('currentFilePath', null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -90,6 +93,39 @@ function App() {
   const closeBypassRef = useRef(false);
   const deferredMarkdown = useDeferredValue(markdown);
   const appWindow = getCurrentWindow();
+  const shouldAnimateLayout = !isDragging && !isDraggingSidebar;
+  const isTextDocument = !currentFilePath || /\.(md|markdown|txt)$/i.test(currentFilePath);
+  const tocItems = useMemo(
+    () => (isTextDocument ? extractTocHeadings(markdown) : []),
+    [isTextDocument, markdown]
+  );
+  const markdownPreviewComponents = useMemo(() => {
+    const headingCounts = new Map();
+    const createHeading = (tagName) => function Heading({ children, ...props }) {
+      const text = flattenReactNodeText(children);
+      const id = createUniqueHeadingId(text, headingCounts);
+      const Tag = tagName;
+      return (
+        <Tag
+          id={`jm-heading-${id}`}
+          data-jm-heading-id={id}
+          className="scroll-mt-6"
+          {...props}
+        >
+          {children}
+        </Tag>
+      );
+    };
+
+    return {
+      h1: createHeading('h1'),
+      h2: createHeading('h2'),
+      h3: createHeading('h3'),
+      h4: createHeading('h4'),
+      h5: createHeading('h5'),
+      h6: createHeading('h6'),
+    };
+  }, [deferredMarkdown]);
 
   const { handleMarkdownChange, handleFormatText, handleImagePasted } = useMarkdownEditor({
     markdown,
@@ -218,9 +254,49 @@ function App() {
     void openPreferencesWindow();
   }, []);
 
+  const handleSelectToc = useCallback((item) => {
+    const previewHeading = previewSectionRef.current?.querySelector?.(`[data-jm-heading-id="${item.id}"]`);
+    if (previewHeading) {
+      previewHeading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
+    const textarea = editorAreaRef.current?.getTextareaElement?.();
+    if (!textarea) {
+      return;
+    }
+
+    const offset = getLineStartOffset(markdownRef.current, item.line);
+    textarea.focus();
+    textarea.setSelectionRange(offset, offset);
+  }, []);
+
   const handleNewWindow = useCallback(() => {
     openDocumentWindow();
   }, []);
+
+  const handleClipUrl = useCallback(async () => {
+    const textarea = editorAreaRef.current?.getTextareaElement?.();
+    if (!textarea) {
+      setDragNotice({
+        mode: 'info',
+        title: 'Clip Unavailable',
+        message: 'Open a text document first, then select a URL in the editor.',
+      });
+      return;
+    }
+
+    try {
+      await clipFromSelection(textarea, markdown, setMarkdown, setHasUnsavedChanges);
+      markdownRef.current = textarea.value;
+    } catch (error) {
+      setDragNotice({
+        mode: 'info',
+        title: 'Clip Failed',
+        message: error?.message || 'The selected content could not be clipped.',
+      });
+    }
+  }, [clipFromSelection, markdown, setHasUnsavedChanges]);
 
   const {
     selectedSidebarPath,
@@ -365,7 +441,7 @@ function App() {
           className="pointer-events-auto absolute inset-x-0 top-0 z-30 h-5"
           style={{ backgroundColor: 'transparent' }}
         />
-        <main className="flex min-h-0 flex-1 gap-1 overflow-hidden p-1">
+        <main className="flex min-h-0 flex-1 gap-0 overflow-hidden">
         {sidebarVisible && (
           <SidebarPanel
             currentFilePath={currentFilePath}
@@ -412,19 +488,32 @@ function App() {
             selectedSidebarPath={selectedSidebarPath}
             setSidebarRef={sidebarRef}
             sidebarWidth={sidebarWidth}
+            tocItems={tocItems}
+            onSelectToc={handleSelectToc}
+            isDarkMode={isDarkMode}
+            previewVisible={previewVisible}
+            previewMode={previewMode}
+            onToggleTheme={toggleTheme}
+            onTogglePreview={() => setPreviewVisible((prev) => !prev)}
+            onTogglePreviewMode={() => setPreviewMode((prev) => (prev === 'markdown' ? 'pdf' : 'markdown'))}
+            chars={chars}
+            words={words}
+            lines={lines}
+            onClipUrl={handleClipUrl}
+            isClipping={isClipping}
           />
         )}
 
         {sidebarVisible && (
           <div
             onMouseDown={() => setIsDraggingSidebar(true)}
-            className={`flex-shrink-0 w-1 cursor-col-resize hover:bg-blue-500/50 transition-colors ${isDraggingSidebar ? 'bg-blue-500' : ''}`}
+            className={`flex-shrink-0 w-[3px] cursor-col-resize hover:bg-blue-500/50 transition-colors ${isDraggingSidebar ? 'bg-blue-500' : ''}`}
           />
         )}
 
         <section
           style={{ width: previewVisible ? `${editorWidth}%` : '100%' }}
-          className="flex min-h-0 overflow-hidden"
+          className={`flex min-h-0 overflow-hidden ${shouldAnimateLayout ? 'transition-[width] duration-300 ease-out' : ''}`}
         >
           <EditorArea
             ref={editorAreaRef}
@@ -447,52 +536,62 @@ function App() {
           />
         </section>
 
-        {previewVisible && (
-          <div
-            onMouseDown={handleMouseDown}
-            className={`flex-shrink-0 w-1 cursor-col-resize hover:bg-blue-500/50 transition-colors ${isDragging ? 'bg-blue-500' : ''}`}
-          />
-        )}
+        <div
+          onMouseDown={previewVisible ? handleMouseDown : undefined}
+          className={`flex-shrink-0 cursor-col-resize hover:bg-blue-500/50 ${shouldAnimateLayout ? 'transition-[width,opacity,background-color] duration-300 ease-out' : 'transition-colors'} ${isDragging ? 'bg-blue-500' : ''}`}
+          style={{
+            width: previewVisible ? '3px' : '0px',
+            opacity: previewVisible ? 1 : 0,
+            pointerEvents: previewVisible ? 'auto' : 'none',
+          }}
+        />
 
-        {previewVisible && (
-          <section
-            className="jm-preview-surface flex min-h-0 flex-1 flex-col overflow-hidden"
-            style={{
-              backgroundColor: previewMode === 'markdown' ? previewBgColor : 'rgba(226, 232, 240, 0.52)',
-              color: previewTextColor,
-            }}
-          >
-            {previewFilePath ? (
-              <div className="flex-1 min-h-0">
-                <FilePreview filePath={previewFilePath} />
-              </div>
-            ) : previewMode === 'markdown' ? (
-              <div className="jm-preview-scroll min-h-0 flex-1 overflow-y-auto px-8 py-8">
-                <article
-                  ref={previewSectionRef}
-                  className="jm-markdown-preview mx-auto max-w-4xl"
-                  style={{
-                    color: previewTextColor,
-                    fontSize: currentFont.previewSize,
-                    fontFamily: currentFontFamily.family,
-                  }}
-                >
-                  <MarkdownPreview content={deferredMarkdown} attachmentFolder={attachmentFolder} />
-                </article>
-              </div>
-            ) : (
-              <div className="min-h-0 flex-1 overflow-hidden">
-                <PDFPreview
+        <section
+          className={`jm-preview-surface flex min-h-0 flex-col overflow-hidden ${shouldAnimateLayout ? 'transition-[width,opacity,transform] duration-300 ease-out' : ''}`}
+          style={{
+            width: previewVisible ? `${100 - editorWidth}%` : '0%',
+            opacity: previewVisible ? 1 : 0,
+            transform: previewVisible ? 'translateX(0)' : 'translateX(12px)',
+            backgroundColor: previewMode === 'markdown' ? previewBgColor : 'rgba(226, 232, 240, 0.52)',
+            color: previewTextColor,
+            pointerEvents: previewVisible ? 'auto' : 'none',
+          }}
+        >
+          {previewFilePath ? (
+            <div className="flex-1 min-h-0">
+              <FilePreview filePath={previewFilePath} />
+            </div>
+          ) : previewMode === 'markdown' ? (
+            <div className="jm-preview-scroll min-h-0 flex-1 overflow-y-auto px-8 py-8">
+              <article
+                ref={previewSectionRef}
+                className="jm-markdown-preview mx-auto max-w-4xl"
+                style={{
+                  color: previewTextColor,
+                  fontSize: currentFont.previewSize,
+                  fontFamily: currentFontFamily.family,
+                }}
+              >
+                <MarkdownPreview
                   content={deferredMarkdown}
                   attachmentFolder={attachmentFolder}
-                  fontFamily={currentFontFamily.family}
-                  fontSize={currentFont.previewSize}
-                  pageRef={previewSectionRef}
+                  currentFilePath={currentFilePath}
+                  components={markdownPreviewComponents}
                 />
-              </div>
-            )}
-          </section>
-        )}
+              </article>
+            </div>
+          ) : (
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <PDFPreview
+                content={deferredMarkdown}
+                attachmentFolder={attachmentFolder}
+                fontFamily={currentFontFamily.family}
+                fontSize={currentFont.previewSize}
+                pageRef={previewSectionRef}
+              />
+            </div>
+          )}
+        </section>
       </main>
 
         {previewVisible && previewMode === 'markdown' && (

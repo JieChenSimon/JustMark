@@ -13,7 +13,7 @@ export const InlineCreateRow = memo(function InlineCreateRow({
     onConfirm,
     onCancel
 }) {
-    const indent = level * 12;
+    const indent = level * 10;
     return (
         <div
             className="w-full px-1.5 py-0.5 text-left text-[11px] flex items-center gap-1 transition-all group"
@@ -100,7 +100,7 @@ export const FileTreeItem = memo(function FileTreeItem({
     const isExpanded = expandedFolders.has(fullPath);
     const isCurrentDocument = currentFilePath === fullPath;
     const isSelected = selectedSidebarPath === fullPath;
-    const indent = getPathDepth(fullPath, rootPath) * 12;
+    const indent = getPathDepth(fullPath, rootPath) * 10;
     const isDragged = draggedPath === fullPath;
     const isDropTarget = dropTargetPath === fullPath;
     const isInvalidDropTarget = invalidDropPath === fullPath;
@@ -132,8 +132,11 @@ export const FileTreeItem = memo(function FileTreeItem({
         }
 
         let cancelled = false;
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setIsLoading(true);
+        const shouldShowLoading = children.length === 0;
+        if (shouldShowLoading) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setIsLoading(true);
+        }
 
         getSubfolderContents(fullPath)
             .then((contents) => {
@@ -154,23 +157,25 @@ export const FileTreeItem = memo(function FileTreeItem({
             })
             .catch(() => {
                 if (!cancelled) {
-                    setChildren([]);
-                    setIsLoading(false);
+                    if (shouldShowLoading) {
+                        setChildren([]);
+                        setIsLoading(false);
+                    }
                 }
             });
 
         return () => {
             cancelled = true;
         };
-    }, [entry.isDirectory, folderRefreshTimestamps, fullPath, getSubfolderContents, isExpanded]);
+    }, [children.length, entry.isDirectory, folderRefreshTimestamps, fullPath, getSubfolderContents, isExpanded]);
 
     const handleClick = () => {
-        if (onSelectEntry) {
-            onSelectEntry(fullPath, entry.isDirectory);
-        }
         if (entry.isDirectory) {
             onToggleFolder(fullPath);
         } else {
+            if (onSelectEntry) {
+                onSelectEntry(fullPath, entry.isDirectory);
+            }
             onOpenFile(fullPath);
         }
     };
@@ -256,7 +261,7 @@ export const FileTreeItem = memo(function FileTreeItem({
                 onDragEnd={handleDragEnd}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
-                className={`px-2 py-1 text-left text-[11px] flex items-center gap-1 transition-all group rounded-[9px] ${isDropTarget
+                className={`select-none px-1.5 py-0.5 text-left text-[11px] flex items-center gap-1 transition-all group rounded-[7px] ${isDropTarget
                     ? 'bg-[#dce9ff] dark:bg-blue-500/20 ring-1 ring-inset ring-[#9dbaf6] dark:ring-blue-400/40 shadow-[0_0_0_1px_rgba(59,130,246,0.06)]'
                     : isInvalidDropTarget
                         ? 'bg-red-500/6 ring-1 ring-inset ring-red-500/35'
@@ -340,14 +345,14 @@ export const FileTreeItem = memo(function FileTreeItem({
                 )}
             </button>
 
-            {/* macOS 风格的右键菜单 - 更紧凑 */}
+            {/* macOS 原生风格右键菜单 */}
             {contextMenu && contextMenu.path === fullPath && (
                 <div
-                    className="fixed z-50 overflow-hidden rounded-[12px] border border-slate-200/80 dark:border-slate-700/80 bg-white/96 dark:bg-slate-800/96 shadow-[0_12px_28px_rgba(15,23,42,0.12)] backdrop-blur-xl animate-scale-in origin-top-left"
+                    className="fixed z-50 rounded-md border border-black/[0.08] dark:border-white/[0.12] bg-[#fbfbfbf5] dark:bg-[#2b2b2bf5] shadow-[0_0_0_0.5px_rgba(0,0,0,0.04),0_3px_12px_rgba(0,0,0,0.15),0_10px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_0_0_0.5px_rgba(255,255,255,0.08),0_3px_12px_rgba(0,0,0,0.4),0_10px_32px_rgba(0,0,0,0.5)] backdrop-blur-[40px] animate-scale-in origin-top-left py-0.5"
                     style={{
                         top: `${Math.min(contextMenu.y, window.innerHeight - 100)}px`,
                         left: `${contextMenu.x}px`,
-                        width: '172px'
+                        width: '140px'
                     }}
                 >
                     {contextMenu.type === 'folder' && (
@@ -357,10 +362,10 @@ export const FileTreeItem = memo(function FileTreeItem({
                                     onStartInlineCreate(fullPath, 'file');
                                     setContextMenu(null);
                                 }}
-                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-medium text-slate-700 dark:text-slate-200 transition-colors hover:bg-[#edf3ff] dark:hover:bg-slate-700/50"
+                                className="flex w-full items-center gap-1.5 px-2 py-0.5 text-left text-[11.5px] text-[#1d1d1f] dark:text-[#f5f5f7] transition-colors rounded-sm hover:bg-[#0066ff] hover:text-white"
                             >
-                                <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                                 </svg>
                                 <span>New File</span>
                             </button>
@@ -369,14 +374,14 @@ export const FileTreeItem = memo(function FileTreeItem({
                                     onStartInlineCreate(fullPath, 'folder');
                                     setContextMenu(null);
                                 }}
-                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-medium text-slate-700 dark:text-slate-200 transition-colors hover:bg-[#edf3ff] dark:hover:bg-slate-700/50"
+                                className="flex w-full items-center gap-1.5 px-2 py-0.5 text-left text-[11.5px] text-[#1d1d1f] dark:text-[#f5f5f7] transition-colors rounded-sm hover:bg-[#0066ff] hover:text-white"
                             >
-                                <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7a2 2 0 012-2h3l2 2h9a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V7z" />
+                                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 7a2 2 0 012-2h3l2 2h9a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V7z" />
                                 </svg>
                                 <span>New Folder</span>
                             </button>
-                            <div className="mx-2 my-1 h-px bg-slate-200/80 dark:bg-slate-700/80" />
+                            <div className="h-px bg-black/[0.08] dark:bg-white/[0.08] my-0.5" />
                         </>
                     )}
                     <button
@@ -396,10 +401,10 @@ export const FileTreeItem = memo(function FileTreeItem({
                                 }
                             }, 50);
                         }}
-                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-medium text-slate-700 transition-colors hover:bg-[#edf3ff]"
+                        className="flex w-full items-center gap-1.5 px-2 py-0.5 text-left text-[11.5px] text-[#1d1d1f] dark:text-[#f5f5f7] transition-colors rounded-sm hover:bg-[#0066ff] hover:text-white"
                     >
-                        <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                         <span>Rename</span>
                     </button>
@@ -408,23 +413,23 @@ export const FileTreeItem = memo(function FileTreeItem({
                             onRevealInFinder(fullPath);
                             setContextMenu(null);
                         }}
-                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-medium text-slate-700 transition-colors hover:bg-[#edf3ff]"
+                        className="flex w-full items-center gap-1.5 px-2 py-0.5 text-left text-[11.5px] text-[#1d1d1f] dark:text-[#f5f5f7] transition-colors rounded-sm hover:bg-[#0066ff] hover:text-white"
                     >
-                        <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                         </svg>
                         <span>Reveal in Finder</span>
                     </button>
-                    <div className="mx-2 my-1 h-px bg-slate-200/80" />
+                    <div className="h-px bg-black/[0.08] dark:bg-white/[0.08] my-0.5" />
                     <button
                         onClick={(e) => {
                             onDeleteEntry(fullPath, e);
                             setContextMenu(null);
                         }}
-                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-medium text-red-600 dark:text-red-400 transition-colors hover:bg-[#fff1f1] dark:hover:bg-red-500/10"
+                        className="flex w-full items-center gap-1.5 px-2 py-0.5 text-left text-[11.5px] text-[#1d1d1f] dark:text-[#f5f5f7] transition-colors rounded-sm hover:bg-[#0066ff] hover:text-white"
                     >
-                        <svg className="w-3 h-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3H4v2h16V7h-3z" />
+                        <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3H4v2h16V7h-3z" />
                         </svg>
                         <span>Delete</span>
                     </button>

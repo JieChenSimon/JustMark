@@ -3,26 +3,45 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import 'katex/dist/katex.min.css';
 import { loadRemarkMath, loadRehypeKatex } from '../../utils/lazyImports';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
 const BASE_REMARK_PLUGINS = [remarkGfm];
 const MATH_PATTERN = /(^|[^\\])(\$\$[\s\S]+?\$\$|\$[^$\n]+\$)/m;
 const KATEX_OPTIONS = { strict: false, trust: true, throwOnError: false };
 
-const MarkdownPreview = memo(({ content, components, attachmentFolder }) => {
+const MarkdownPreview = memo(({ content, components, attachmentFolder, currentFilePath }) => {
   const [mathPlugins, setMathPlugins] = useState(null);
 
-  const processedMarkdown = useMemo(() => {
-    if (!attachmentFolder || !content.includes('![')) return content;
-    return content.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
-      if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) {
-        return match;
-      }
-      const fullPath = `${attachmentFolder}/${src}`;
-      return `![${alt}](${fullPath})`;
-    });
-  }, [content, attachmentFolder]);
+  const imageComponent = useMemo(() => {
+    const baseDir = currentFilePath ? currentFilePath.substring(0, currentFilePath.lastIndexOf('/')) : '';
 
-  const hasMath = useMemo(() => MATH_PATTERN.test(processedMarkdown), [processedMarkdown]);
+    return ({ src, alt, ...props }) => {
+      if (!src || src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:') || src.startsWith('asset://')) {
+        return <img src={src} alt={alt} {...props} />;
+      }
+
+      let fullPath;
+      if (src.startsWith('/')) {
+        fullPath = src;
+      } else if (baseDir) {
+        fullPath = `${baseDir}/${src}`;
+      } else if (attachmentFolder) {
+        fullPath = `${attachmentFolder}/${src}`;
+      } else {
+        return <img src={src} alt={alt} {...props} />;
+      }
+
+      const tauriPath = convertFileSrc(fullPath);
+      return <img src={tauriPath} alt={alt} {...props} />;
+    };
+  }, [attachmentFolder, currentFilePath]);
+
+  const mergedComponents = useMemo(() => ({
+    ...components,
+    img: imageComponent
+  }), [components, imageComponent]);
+
+  const hasMath = useMemo(() => MATH_PATTERN.test(content), [content]);
 
   useEffect(() => {
     if (!hasMath || mathPlugins) return;
@@ -56,14 +75,15 @@ const MarkdownPreview = memo(({ content, components, attachmentFolder }) => {
     <ReactMarkdown
       remarkPlugins={remarkPlugins}
       rehypePlugins={rehypePlugins}
-      components={components}
+      components={mergedComponents}
     >
-      {processedMarkdown}
+      {content}
     </ReactMarkdown>
   );
 }, (prev, next) =>
   prev.content === next.content &&
-  prev.attachmentFolder === next.attachmentFolder
+  prev.attachmentFolder === next.attachmentFolder &&
+  prev.currentFilePath === next.currentFilePath
 );
 
 MarkdownPreview.displayName = 'MarkdownPreview';

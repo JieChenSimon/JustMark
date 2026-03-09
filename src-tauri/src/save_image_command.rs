@@ -13,6 +13,9 @@ pub async fn save_image_from_clipboard(
 ) -> Result<String, String> {
     // 在 blocking 线程中执行 CPU 密集型解码和 I/O，避免阻塞主线程
     tokio::task::spawn_blocking(move || {
+        println!("[save_image] folder_path: {}", folder_path);
+        println!("[save_image] filename: {}", filename);
+
         // Decode base64 data
         let image_data = general_purpose::STANDARD
             .decode(&base64_data)
@@ -20,13 +23,19 @@ pub async fn save_image_from_clipboard(
 
         // Create assets/images directory
         let assets_path = Path::new(&folder_path).join("assets").join("images");
+        println!("[save_image] assets_path: {:?}", assets_path);
+
         fs::create_dir_all(&assets_path)
             .map_err(|e| format!("Failed to create assets/images directory: {}", e))?;
 
         // Save the image file
         let image_path = assets_path.join(&filename);
+        println!("[save_image] image_path: {:?}", image_path);
+
         fs::write(&image_path, image_data)
             .map_err(|e| format!("Failed to write image file: {}", e))?;
+
+        println!("[save_image] Image saved successfully");
 
         // Return relative path for Markdown
         let relative_path = format!("assets/images/{}", filename);

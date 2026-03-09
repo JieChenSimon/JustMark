@@ -127,3 +127,43 @@ export function IconWindowNew(props) {
     </svg>
   );
 }
+
+export function IconListTree(props) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M4 5.5h1.5" />
+      <path d="M8 5.5h8" />
+      <path d="M4 10h4" />
+      <path d="M8 10h8" />
+      <path d="M4 14.5h1.5" />
+      <path d="M8 14.5h8" />
+      <path d="M6 5.5v9" />
+      <path d="M6 10h2" />
+    </svg>
+  );
+}
+
+export function IconTableOfContents(props) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M4 5.5h2" />
+      <path d="M9 5.5h7" />
+      <path d="M4 10h2" />
+      <path d="M9 10h7" />
+      <path d="M4 14.5h2" />
+      <path d="M9 14.5h7" />
+      <circle cx="7.2" cy="5.5" r="0.6" fill="currentColor" stroke="none" />
+      <circle cx="7.2" cy="10" r="0.6" fill="currentColor" stroke="none" />
+      <circle cx="7.2" cy="14.5" r="0.6" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function IconClip(props) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" {...props}>
+      <path d="M10.5 3.5v10a3 3 0 0 1-6 0v-8a1.5 1.5 0 0 1 3 0v7" />
+      <path d="M10.5 6.5v7a3 3 0 0 0 6 0v-8a1.5 1.5 0 0 0-3 0v7" />
+    </svg>
+  );
+}

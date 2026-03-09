@@ -7,12 +7,12 @@
     --jm-window-bg: #f5f5f5;
     --jm-text: #1a1a1a;
     --jm-muted: #6b6b6b;
-    --jm-accent: #2563eb;
-    --jm-accent-soft: rgba(37, 99, 235, 0.08);
+    --jm-accent: #007AFF;
+    --jm-accent-soft: rgba(0, 122, 255, 0.08);
     --jm-panel: rgba(255, 255, 255, 0.85);
     --jm-panel-strong: rgba(255, 255, 255, 0.95);
     --jm-panel-border: rgba(0, 0, 0, 0.06);
-    --jm-panel-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    --jm-panel-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   }
 
   html,
@@ -63,19 +63,20 @@
   }
 
   .jm-button {
-    @apply inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all duration-150;
+    @apply inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-[13px] font-medium;
     background: transparent;
     border: none;
     color: var(--jm-text);
+    transition: background-color 0.12s ease-in-out, transform 0.08s ease-in-out;
   }
 
   .jm-button:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(0, 0, 0, 0.04);
   }
 
   .jm-button:active {
-    background: rgba(0, 0, 0, 0.08);
-    transform: scale(0.98);
+    background: rgba(0, 0, 0, 0.06);
+    transform: scale(0.985);
   }
 
   .jm-button-primary {
@@ -85,8 +86,20 @@
 
   .jm-button-accent {
     color: white;
-    background: linear-gradient(180deg, #4f8dfd 0%, #2563eb 100%);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 20px rgba(37, 99, 235, 0.2);
+    background: linear-gradient(180deg, #3395FF 0%, #007AFF 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 2px 8px rgba(0, 122, 255, 0.25);
+    transition: background 0.12s ease-in-out, box-shadow 0.12s ease-in-out, transform 0.08s ease-in-out;
+  }
+
+  .jm-button-accent:hover {
+    background: linear-gradient(180deg, #4DA3FF 0%, #1A8AFF 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 3px 10px rgba(0, 122, 255, 0.3);
+  }
+
+  .jm-button-accent:active {
+    background: linear-gradient(180deg, #007AFF 0%, #0066E0 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 1px 4px rgba(0, 122, 255, 0.2);
+    transform: scale(0.985);
   }
 
   .jm-title-badge {
@@ -96,28 +109,21 @@
 
   .jm-panel {
     background: var(--jm-panel);
-    border: 1px solid rgba(15, 23, 42, 0.05);
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.07);
+    border: none;
+    box-shadow: none;
     backdrop-filter: blur(18px);
   }
 
   .jm-editor-surface {
-    @apply rounded-xl;
     background: white;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-    transition: box-shadow 0.2s ease;
-  }
-
-  .jm-editor-surface:focus-within {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: none;
+    box-shadow: none;
   }
 
   .jm-preview-surface {
-    @apply rounded-xl;
     background: white;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    border: none;
+    box-shadow: none;
   }
 
   .jm-statusbar {
@@ -139,12 +145,12 @@
   --jm-window-bg: #1a1a1a;
   --jm-text: #e5e5e5;
   --jm-muted: #a3a3a3;
-  --jm-accent: #60a5fa;
-  --jm-accent-soft: rgba(96, 165, 250, 0.12);
+  --jm-accent: #0A84FF;
+  --jm-accent-soft: rgba(10, 132, 255, 0.12);
   --jm-panel: rgba(38, 38, 38, 0.85);
   --jm-panel-strong: rgba(38, 38, 38, 0.95);
   --jm-panel-border: rgba(255, 255, 255, 0.1);
-  --jm-panel-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --jm-panel-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .dark .jm-shell {
@@ -166,6 +172,10 @@
 }
 
 .dark .jm-button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dark .jm-button:active {
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -177,8 +187,6 @@
 .dark .jm-editor-surface,
 .dark .jm-preview-surface {
   background: #262626;
-  border-color: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .dark .jm-statusbar {
@@ -251,7 +259,7 @@
 }
 
 .jm-markdown-preview a {
-  color: #2563eb;
+  color: #007AFF;
   text-decoration: none;
 }
 
@@ -260,7 +268,7 @@
 }
 
 .dark .jm-markdown-preview a {
-  color: #60a5fa;
+  color: #0A84FF;
 }
 
 .jm-markdown-preview strong,
@@ -271,13 +279,13 @@
 }
 
 .jm-markdown-preview blockquote {
-  border-left: 3px solid rgba(37, 99, 235, 0.28);
+  border-left: 3px solid rgba(0, 122, 255, 0.28);
   padding-left: 1em;
   color: color-mix(in srgb, currentColor 82%, transparent);
 }
 
 .dark .jm-markdown-preview blockquote {
-  border-left-color: rgba(96, 165, 250, 0.4);
+  border-left-color: rgba(10, 132, 255, 0.4);
 }
 
 .jm-markdown-preview hr {
@@ -310,7 +318,7 @@
 
 .jm-markdown-preview pre {
   background: rgba(15, 23, 42, 0.92);
-  border-radius: 14px;
+  border-radius: 6px;
   color: #e2e8f0;
   overflow-x: auto;
   padding: 1em 1.1em;
@@ -324,8 +332,8 @@
 }
 
 .jm-markdown-preview img {
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
   display: block;
   height: auto;
   margin: 1.2em auto;
@@ -388,7 +396,7 @@
 
 .jm-pdf-page {
   background: #ffffff;
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.16);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
   color: #0f172a;
   min-height: 1123px;
   padding: 72px 78px;
@@ -408,21 +416,9 @@
 }
 
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: rgba(100, 116, 139, 0.2);
-  border-radius: 999px;
-}
-
-.dark ::-webkit-scrollbar-thumb {
-  background-color: rgba(148, 163, 184, 0.4);
+  width: 0px;
+  height: 0px;
+  display: none;
 }
 
 .a4-paper {

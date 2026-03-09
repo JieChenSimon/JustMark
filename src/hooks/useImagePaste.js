@@ -20,9 +20,10 @@ export const useImagePaste = (currentFolder, currentFilePath) => {
             return null;
         }
 
-        // Determine the folder path
-        const folderPath = currentFolder ||
-            currentFilePath.substring(0, currentFilePath.lastIndexOf('/'));
+        // Determine the folder path - always use current file's directory if available
+        const folderPath = currentFilePath
+            ? currentFilePath.substring(0, currentFilePath.lastIndexOf('/'))
+            : currentFolder;
 
         // Generate unique filename with timestamp
         const now = new Date();
