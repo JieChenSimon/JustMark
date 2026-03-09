@@ -167,3 +167,12 @@ export function IconClip(props) {
     </svg>
   );
 }
+
+export function IconSync(props) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" {...props}>
+      <path d="M3.5 10a6.5 6.5 0 0 1 11-4.6M16.5 10a6.5 6.5 0 0 1-11 4.6" />
+      <path d="M14.5 3v2.4h2.4M5.5 17v-2.4H3.1" />
+    </svg>
+  );
+}

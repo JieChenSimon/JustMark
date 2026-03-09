@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useTheme } from '../hooks/useTheme';
 import { useSettings } from '../hooks/useSettings';
 import { BACKGROUND_COLORS, FONT_FAMILIES, FONT_OPTIONS } from '../constants/theme';
+import { initWebDAV } from '../utils/webdav';
 
 const PREFERENCE_SECTIONS = [
   {
@@ -14,27 +15,35 @@ const PREFERENCE_SECTIONS = [
     id: 'files',
     title: 'Files',
     description: 'Defaults that affect markdown attachments, file browsing, and save behavior.'
+  },
+  {
+    id: 'sync',
+    title: 'Sync',
+    description: 'Configure WebDAV synchronization for your documents.'
   }
 ];
 
-function PreferenceSection({ id, title, description, children }) {
+function PreferenceSection({ id, title, description, children, statusIndicator }) {
   return (
-    <section id={id} className="rounded-[18px] border border-[rgba(15,23,42,0.08)] bg-white/90 p-5 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+    <section id={id} className="border-b border-gray-200/80 pb-6">
       <div className="mb-4">
-        <h2 className="text-[13px] font-semibold text-slate-900">{title}</h2>
-        {description ? <p className="mt-1 text-[11px] leading-5 text-slate-500">{description}</p> : null}
+        <div className="flex items-center gap-2">
+          <h2 className="text-[13px] font-semibold text-slate-900">{title}</h2>
+          {statusIndicator}
+        </div>
+        {description ? <p className="mt-1 text-[12px] text-slate-600">{description}</p> : null}
       </div>
-      <div className="space-y-4">{children}</div>
+      <div className="space-y-3">{children}</div>
     </section>
   );
 }
 
 function PreferenceRow({ label, hint, control }) {
   return (
-    <div className="grid gap-2 md:grid-cols-[180px_minmax(0,1fr)] md:items-center">
-      <div>
-        <div className="text-[12px] font-medium text-slate-800">{label}</div>
-        {hint ? <div className="mt-1 text-[11px] leading-5 text-slate-500">{hint}</div> : null}
+    <div className="grid gap-3 md:grid-cols-[200px_minmax(0,1fr)] md:items-start md:py-2">
+      <div className="pt-1.5">
+        <div className="text-[13px] font-medium text-slate-900">{label}</div>
+        {hint ? <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">{hint}</div> : null}
       </div>
       <div>{control}</div>
     </div>
@@ -47,10 +56,10 @@ function Toggle({ checked, onChange }) {
       type="button"
       aria-pressed={checked}
       onClick={() => onChange(!checked)}
-      className={`relative h-6 w-11 rounded-full transition ${checked ? 'bg-blue-500' : 'bg-slate-300'}`}
+      className={`relative h-5 w-9 rounded-full transition-colors ${checked ? 'bg-[#007AFF]' : 'bg-gray-300'}`}
     >
       <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${checked ? 'left-[22px]' : 'left-0.5'}`}
+        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${checked ? 'translate-x-[18px]' : 'translate-x-0.5'}`}
       />
     </button>
   );
@@ -77,44 +86,81 @@ export default function PreferencesWindow() {
     setFileSortBy
   } = useSettings();
 
+  const [webdavUrl, setWebdavUrl] = useState('');
+  const [webdavUsername, setWebdavUsername] = useState('');
+  const [webdavPassword, setWebdavPassword] = useState('');
+  const [webdavFolder, setWebdavFolder] = useState('/');
+  const [webdavStatus, setWebdavStatus] = useState('');
+  const [webdavConnected, setWebdavConnected] = useState(false);
+
   useEffect(() => {
-    void appWindow.setTitle('Settings');
-  }, [appWindow]);
+    const config = localStorage.getItem('webdav_config');
+    if (config) {
+      try {
+        const parsed = JSON.parse(config);
+        if (parsed) {
+          setWebdavUrl(parsed.url || '');
+          setWebdavUsername(parsed.username || '');
+          setWebdavPassword(parsed.password || '');
+          setWebdavFolder(parsed.folder || '/');
+          setWebdavConnected(parsed.connected || false);
+        }
+      } catch (error) {
+        console.error('Failed to parse WebDAV config:', error);
+      }
+    }
+  }, []);
+
+  const handleWebDAVConnect = async () => {
+    setWebdavStatus('Connecting...');
+
+    const result = initWebDAV(webdavUrl, webdavUsername, webdavPassword, webdavFolder);
+    if (!result.success) {
+      setWebdavConnected(false);
+      setWebdavStatus('❌ Failed: ' + result.error);
+      return;
+    }
+
+    try {
+      const { testConnection } = await import('../utils/webdav');
+      await testConnection();
+
+      const config = { url: webdavUrl, username: webdavUsername, password: webdavPassword, folder: webdavFolder, connected: true };
+      setWebdavConnected(true);
+      setWebdavStatus('✅ Connected');
+      localStorage.setItem('webdav_config', JSON.stringify(config));
+      setTimeout(() => setWebdavStatus(''), 3000);
+    } catch (error) {
+      console.error('[Connect] Test failed:', error);
+      setWebdavConnected(false);
+      setWebdavStatus('❌ Failed: ' + error);
+    }
+  };
 
   return (
-    <div className="h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] text-slate-900">
-      <div className="mx-auto flex h-full max-w-6xl flex-col px-4 pb-4 pt-4 md:px-6">
-        <header className="mb-4 rounded-[20px] border border-[rgba(15,23,42,0.08)] bg-white/88 px-5 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur-xl">
-          <div className="text-[22px] font-semibold tracking-[-0.02em] text-slate-900">Settings</div>
-          <p className="mt-1 text-[12px] text-slate-500">Application-wide preferences for writing, appearance, and files.</p>
+    <div className="h-screen overflow-hidden bg-[#ececec] text-slate-900">
+      <div className="mx-auto flex h-full max-w-5xl flex-col">
+        <header className="border-b border-gray-300/50 bg-white/95 px-6 py-3 backdrop-blur-sm">
+          <div className="text-[15px] font-semibold text-slate-900">Settings</div>
         </header>
 
-        <main className="grid min-h-0 flex-1 gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
-          <aside className="rounded-[18px] border border-[rgba(15,23,42,0.08)] bg-white/88 p-3 shadow-[0_10px_24px_rgba(15,23,42,0.04)] backdrop-blur-xl">
-            <div className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Preferences
-            </div>
-            <nav className="space-y-1">
+        <main className="grid min-h-0 flex-1 grid-cols-[200px_minmax(0,1fr)]">
+          <aside className="border-r border-gray-300/50 bg-white/60 backdrop-blur-sm">
+            <nav className="space-y-0.5 px-3 py-4">
               {PREFERENCE_SECTIONS.map((section) => (
                 <a
                   key={section.id}
                   href={`#${section.id}`}
-                  className="block rounded-[12px] px-3 py-2 text-[12px] font-medium text-slate-700 transition hover:bg-[#edf3ff] hover:text-[#1d4ed8]"
+                  className="block rounded-md px-3 py-1.5 text-[13px] font-medium text-slate-700 transition-colors hover:bg-gray-200/60"
                 >
                   {section.title}
                 </a>
               ))}
             </nav>
-            <div className="mt-5 rounded-[14px] border border-slate-200/80 bg-[#f8f9fb] px-3 py-2.5">
-              <div className="text-[11px] font-medium text-slate-700">JustMark</div>
-              <div className="mt-1 text-[10px] leading-5 text-slate-500">
-                Your settings apply instantly across all open document windows.
-              </div>
-            </div>
           </aside>
 
-          <div className="min-h-0 overflow-y-auto pr-1">
-            <div className="space-y-5 pb-4">
+          <div className="min-h-0 overflow-y-auto bg-white/40 backdrop-blur-sm">
+            <div className="space-y-6 px-8 py-6">
               <PreferenceSection
                 id="appearance"
                 title="Appearance"
@@ -127,7 +173,7 @@ export default function PreferencesWindow() {
                     <select
                       value={isDarkMode ? 'dark' : 'light'}
                       onChange={(event) => setIsDarkMode(event.target.value === 'dark')}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 outline-none transition focus:border-blue-400"
+                      className="w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
                     >
                       <option value="light">Light</option>
                       <option value="dark">Dark</option>
@@ -141,7 +187,7 @@ export default function PreferencesWindow() {
                     <select
                       value={fontIndex}
                       onChange={(event) => setFontIndex(Number(event.target.value))}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 outline-none transition focus:border-blue-400"
+                      className="w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
                     >
                       {FONT_OPTIONS.map((option, index) => (
                         <option key={option.label} value={index}>{option.name}</option>
@@ -156,7 +202,7 @@ export default function PreferencesWindow() {
                     <select
                       value={fontFamilyIndex}
                       onChange={(event) => setFontFamilyIndex(Number(event.target.value))}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 outline-none transition focus:border-blue-400"
+                      className="w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
                     >
                       {FONT_FAMILIES.map((option, index) => (
                         <option key={option.name} value={index}>{option.nameZh}</option>
@@ -168,19 +214,19 @@ export default function PreferencesWindow() {
                   label="Reading Background"
                   hint="Set the default paper tint used in the workspace."
                   control={(
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-2 max-w-md">
                       {BACKGROUND_COLORS.map((option, index) => (
                         <button
                           key={option.name}
                           type="button"
                           onClick={() => setBgColorIndex(index)}
-                          className={`rounded-2xl border px-3 py-2 text-left transition ${
-                            bgColorIndex === index ? 'border-blue-400 ring-2 ring-blue-400/20' : 'border-slate-200'
+                          className={`rounded-lg border px-3 py-2.5 text-left transition-all ${
+                            bgColorIndex === index ? 'border-[#007AFF] ring-2 ring-[#007AFF]/30' : 'border-gray-300 hover:border-gray-400'
                           }`}
                           style={{ backgroundColor: option.bg, color: option.text }}
                         >
-                          <div className="text-[11px] font-semibold">{option.name}</div>
-                          <div className="mt-1 text-[10px] opacity-70">{option.description}</div>
+                          <div className="text-[12px] font-semibold">{option.name}</div>
+                          <div className="mt-0.5 text-[11px] opacity-70">{option.description}</div>
                         </button>
                       ))}
                     </div>
@@ -201,7 +247,7 @@ export default function PreferencesWindow() {
                       type="text"
                       value={attachmentFolder}
                       onChange={(event) => setAttachmentFolder(event.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 outline-none transition focus:border-blue-400"
+                      className="w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-400 hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
                       placeholder="00- Attachment"
                     />
                   )}
@@ -213,7 +259,7 @@ export default function PreferencesWindow() {
                     <select
                       value={fileSortBy}
                       onChange={(event) => setFileSortBy(event.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 outline-none transition focus:border-blue-400"
+                      className="w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
                     >
                       <option value="name">Name</option>
                       <option value="type">Type</option>
@@ -225,6 +271,88 @@ export default function PreferencesWindow() {
                   label="Auto Save"
                   hint="Persist changes automatically after editing named documents."
                   control={<Toggle checked={autoSaveEnabled} onChange={setAutoSaveEnabled} />}
+                />
+              </PreferenceSection>
+
+              <PreferenceSection
+                id="sync"
+                title="Sync"
+                description={PREFERENCE_SECTIONS[2].description}
+                statusIndicator={
+                  <div className="flex items-center gap-1.5">
+                    <div className={`h-2 w-2 rounded-full ${webdavConnected ? 'bg-green-500' : 'bg-gray-300'}`} />
+                    <span className="text-[11px] text-slate-500">
+                      {webdavConnected ? 'Connected' : 'Not connected'}
+                    </span>
+                  </div>
+                }
+              >
+                <PreferenceRow
+                  label="Server URL"
+                  hint="WebDAV server address (https://...)"
+                  control={(
+                    <input
+                      type="text"
+                      value={webdavUrl}
+                      onChange={(e) => setWebdavUrl(e.target.value)}
+                      className="w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-400 hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
+                      placeholder="https://example.com/webdav"
+                    />
+                  )}
+                />
+                <PreferenceRow
+                  label="Username"
+                  hint="WebDAV account username"
+                  control={(
+                    <input
+                      type="text"
+                      value={webdavUsername}
+                      onChange={(e) => setWebdavUsername(e.target.value)}
+                      className="w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-400 hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
+                      placeholder="username"
+                    />
+                  )}
+                />
+                <PreferenceRow
+                  label="Password"
+                  hint="WebDAV account password"
+                  control={(
+                    <input
+                      type="password"
+                      value={webdavPassword}
+                      onChange={(e) => setWebdavPassword(e.target.value)}
+                      className="w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-400 hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
+                      placeholder="••••••••"
+                    />
+                  )}
+                />
+                <PreferenceRow
+                  label="Remote Folder"
+                  hint="Remote path for syncing documents"
+                  control={(
+                    <input
+                      type="text"
+                      value={webdavFolder}
+                      onChange={(e) => setWebdavFolder(e.target.value)}
+                      className="w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-400 hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
+                      placeholder="/Documents"
+                    />
+                  )}
+                />
+                <PreferenceRow
+                  label="Connection"
+                  hint="Test and save WebDAV configuration"
+                  control={(
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleWebDAVConnect}
+                        className="rounded-md bg-[#007AFF] px-3 py-1.5 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-[#0051D5]"
+                      >
+                        Connect
+                      </button>
+                      {webdavStatus && <span className="text-[12px] text-slate-600">{webdavStatus}</span>}
+                    </div>
+                  )}
                 />
               </PreferenceSection>
             </div>

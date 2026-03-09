@@ -1,42 +1,46 @@
-import { createClient } from 'webdav';
+import { invoke } from '@tauri-apps/api/core';
 
-let client = null;
+let config = null;
 
-export const initWebDAV = (url, username, password) => {
+export const initWebDAV = (url, username, password, folder = '/') => {
   try {
-    client = createClient(url, {
-      username,
-      password
-    });
+    config = { url, username, password, folder };
+    console.log('[WebDAV] Config saved:', { url, username, folder });
     return { success: true };
   } catch (error) {
+    console.error('[WebDAV] Init failed:', error);
     return { success: false, error: error.message };
   }
 };
 
-export const hasWebDAVClient = () => client !== null;
+export const hasWebDAVClient = () => config !== null;
+
+export const testConnection = async () => {
+  if (!config) throw new Error('WebDAV not initialized');
+  return await invoke('webdav_test_connection', { config });
+};
+
+export const listFiles = async (remotePath) => {
+  if (!config) throw new Error('WebDAV not initialized');
+  const pathConfig = { ...config, folder: remotePath || config.folder };
+  return await invoke('webdav_list_files', { config: pathConfig });
+};
 
 export const uploadFile = async (localPath, remotePath, content) => {
-  if (!client) throw new Error('WebDAV not initialized');
-  await client.putFileContents(remotePath, content);
+  if (!config) throw new Error('WebDAV not initialized');
+  return await invoke('webdav_upload_file', { config, remotePath, content });
 };
 
 export const downloadFile = async (remotePath) => {
-  if (!client) throw new Error('WebDAV not initialized');
-  return await client.getFileContents(remotePath, { format: 'text' });
-};
-
-export const listFiles = async (remotePath = '/') => {
-  if (!client) throw new Error('WebDAV not initialized');
-  return await client.getDirectoryContents(remotePath);
+  if (!config) throw new Error('WebDAV not initialized');
+  return await invoke('webdav_download_file', { config, remotePath });
 };
 
 export const deleteFile = async (remotePath) => {
-  if (!client) throw new Error('WebDAV not initialized');
-  await client.deleteFile(remotePath);
+  throw new Error('Not implemented yet');
 };
 
 export const createDirectory = async (remotePath) => {
-  if (!client) throw new Error('WebDAV not initialized');
-  await client.createDirectory(remotePath, { recursive: true });
+  if (!config) throw new Error('WebDAV not initialized');
+  return await invoke('webdav_create_directory', { config, remotePath });
 };

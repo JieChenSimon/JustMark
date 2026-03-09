@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FileTreeItem, InlineCreateRow } from './FileTreeItem';
-import { IconDocument, IconListTree, IconMoon, IconPreview, IconSun, IconTableOfContents, IconClip } from '../icons/AppIcons';
+import { IconDocument, IconListTree, IconMoon, IconPreview, IconSun, IconTableOfContents, IconClip, IconSync } from '../icons/AppIcons';
+import { useWebDAVSync } from '../../hooks/useWebDAVSync';
 
 export default function SidebarPanel({
   currentFilePath,
@@ -53,6 +54,7 @@ export default function SidebarPanel({
   isClipping,
 }) {
   const [activePage, setActivePage] = useState('files');
+  const { isSyncing, syncProgress, startSync, cancelSync } = useWebDAVSync();
   const isTextDocument = !currentFilePath || /\.(md|markdown|txt)$/i.test(currentFilePath);
 
   useEffect(() => {
@@ -226,6 +228,38 @@ export default function SidebarPanel({
         </div>
         <div className="mt-2 flex items-end justify-between border-t border-slate-200/60 px-1.5 pt-1.5 dark:border-slate-700/60">
           <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={isSyncing ? cancelSync : startSync}
+            className={`relative flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+              isSyncing
+                ? 'text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20'
+                : 'text-slate-700 hover:bg-black/5 dark:text-slate-200 dark:hover:bg-white/5'
+            }`}
+            title={isSyncing ? `Syncing... ${syncProgress}%` : 'Sync with WebDAV'}
+            aria-label={isSyncing ? 'Cancel sync' : 'Start sync'}
+          >
+            {isSyncing ? (
+              <>
+                <span className="text-[10px] font-semibold">{syncProgress}%</span>
+                <svg className="absolute h-7 w-7" viewBox="0 0 24 24">
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeDasharray={`${syncProgress * 0.628} 62.8`}
+                    className="opacity-40"
+                    transform="rotate(-90 12 12)"
+                  />
+                </svg>
+              </>
+            ) : (
+              <IconSync className="h-3.5 w-3.5" />
+            )}
+          </button>
           <button
             type="button"
             onClick={onClipUrl}
