@@ -241,7 +241,7 @@ export default function SidebarPanel({
           >
             {isSyncing ? (
               <>
-                <span className="text-[10px] font-semibold">{syncProgress}%</span>
+                <span className="text-[7px] font-semibold">{syncProgress}%</span>
                 <svg className="absolute h-7 w-7" viewBox="0 0 24 24">
                   <circle
                     cx="12"
