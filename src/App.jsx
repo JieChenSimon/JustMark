@@ -29,6 +29,7 @@ import { useResizable } from './hooks/useResizable';
 import PreviewColorPicker from './components/PreviewColorPicker';
 import DragNoticeOverlay from './components/sidebar/DragNoticeOverlay';
 import SidebarPanel from './components/sidebar/SidebarPanel';
+import GlobalSearch from './components/GlobalSearch';
 import ConfirmDialog from './components/ConfirmDialog';
 import { parseTags, sortEntries, getTagColor } from './utils/fileHelpers';
 import { createUniqueHeadingId, extractTocHeadings, flattenReactNodeText, getLineStartOffset } from './utils/toc';
@@ -66,7 +67,9 @@ function App() {
   const {
     attachmentFolder,
     autoSaveEnabled,
-    fileSortBy
+    fileSortBy,
+    showHiddenFiles,
+    hiddenFilesWhitelist
   } = useSettings();
   const { recentFiles, addRecentFile, clearRecentFiles, replaceRecentFilePath, removeRecentFilePrefix } = useRecentFiles();
   const { chars, words, lines } = useWordCount(markdown);
@@ -86,6 +89,7 @@ function App() {
   const [sidebarVisible, setSidebarVisible] = useLocalStorage('sidebarVisible', false);
   const [dragNotice, setDragNotice] = useState(null);
   const [previewFilePath, setPreviewFilePath] = useState(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const inlineCreateInputRef = useRef(null);
   const previewSectionRef = useRef(null);
@@ -170,7 +174,9 @@ function App() {
     parseTags,
     setFileTags,
     onPersistMarkdown: persistSavedMarkdown,
-    getTagColor
+    getTagColor,
+    showHiddenFiles,
+    hiddenFilesWhitelist
   });
 
   const handleNewFile = useCallback(() => {
@@ -388,7 +394,8 @@ function App() {
     onBold: () => handleFormatText('bold'),
     onItalic: () => handleFormatText('italic'),
     onStrikethrough: () => handleFormatText('strikethrough'),
-    onLink: () => handleFormatText('link')
+    onLink: () => handleFormatText('link'),
+    onSearch: () => setSearchOpen(true)
   });
 
   useDocumentLifecycle({
@@ -458,7 +465,15 @@ function App() {
           style={{ backgroundColor: 'transparent' }}
         />
         <main className="flex min-h-0 flex-1 gap-0 overflow-hidden">
-        {sidebarVisible && (
+        <div
+          className={`flex-shrink-0 overflow-hidden ${shouldAnimateLayout ? 'transition-[width,opacity,transform] duration-300 ease-out' : ''}`}
+          style={{
+            width: sidebarVisible ? `${sidebarWidth}px` : '0px',
+            opacity: sidebarVisible ? 1 : 0,
+            transform: sidebarVisible ? 'translateX(0)' : 'translateX(-12px)',
+            pointerEvents: sidebarVisible ? 'auto' : 'none',
+          }}
+        >
           <SidebarPanel
             currentFilePath={currentFilePath}
             currentFolder={currentFolder}
@@ -517,15 +532,19 @@ function App() {
             lines={lines}
             onClipUrl={handleClipUrl}
             isClipping={isClipping}
+            onToggleSearch={() => setSearchOpen(true)}
           />
-        )}
+        </div>
 
-        {sidebarVisible && (
-          <div
-            onMouseDown={() => setIsDraggingSidebar(true)}
-            className={`flex-shrink-0 w-[3px] cursor-col-resize hover:bg-blue-500/50 transition-colors ${isDraggingSidebar ? 'bg-blue-500' : ''}`}
-          />
-        )}
+        <div
+          onMouseDown={sidebarVisible ? () => setIsDraggingSidebar(true) : undefined}
+          className={`flex-shrink-0 cursor-col-resize hover:bg-blue-500/50 ${shouldAnimateLayout ? 'transition-[width,opacity,background-color] duration-300 ease-out' : 'transition-colors'} ${isDraggingSidebar ? 'bg-blue-500' : ''}`}
+          style={{
+            width: sidebarVisible ? '3px' : '0px',
+            opacity: sidebarVisible ? 1 : 0,
+            pointerEvents: sidebarVisible ? 'auto' : 'none',
+          }}
+        />
 
         <section
           style={{ width: previewVisible ? `${editorWidth}%` : '100%' }}
@@ -630,6 +649,15 @@ function App() {
       </div>
 
       <DragNoticeOverlay dragOperation={dragOperation} draggedPath={draggedPath} getBaseName={getBaseName} />
+
+      <GlobalSearch
+        isOpen={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        currentFolder={currentFolder}
+        folderContents={folderContents}
+        onOpenFile={(path) => fileOps.openFileInEditor(path, { revealInSidebar: false })}
+        getSubfolderContents={fileOps.getSubfolderContents}
+      />
 
       <ConfirmDialog
         {...dialogProps}

@@ -176,3 +176,12 @@ export function IconSync(props) {
     </svg>
   );
 }
+
+export function IconSearch(props) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" {...props}>
+      <circle cx="8.5" cy="8.5" r="5.75" />
+      <path d="M12.5 12.5l4.25 4.25" />
+    </svg>
+  );
+}

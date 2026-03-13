@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { save, open as openDialog } from '@tauri-apps/plugin-dialog';
 import { writeTextFile, readTextFile, readDir, remove, mkdir, rename, exists, copyFile } from '@tauri-apps/plugin-fs';
 import { getCachedFileTree, invalidateCache } from '../utils/fileCache';
+import { filterHiddenFiles } from '../utils/hiddenFiles';
 
 async function copyEntryRecursive(sourcePath, targetPath) {
   const entries = await readDir(sourcePath);
@@ -33,7 +34,9 @@ export const useFileOperations = ({
   parseTags,
   setFileTags,
   onPersistMarkdown,
-  getTagColor
+  getTagColor,
+  showHiddenFiles,
+  hiddenFilesWhitelist
 }) => {
   const isMountedRef = useRef(true);
   const folderLoadRequestRef = useRef(0);
@@ -137,13 +140,14 @@ export const useFileOperations = ({
     folderLoadRequestRef.current = requestId;
 
     const entries = await getCachedFileTree(folderPath, readDir);
+    const filteredEntries = filterHiddenFiles(entries, showHiddenFiles, hiddenFilesWhitelist);
 
     if (!isMountedRef.current || requestId !== folderLoadRequestRef.current) {
       return;
     }
 
     setCurrentFolder(folderPath);
-    setFolderContents(sortEntries(entries));
+    setFolderContents(sortEntries(filteredEntries));
     setExpandedFolders((prev) => {
       if (!preserveExpanded) {
         return new Set([folderPath]);
@@ -166,19 +170,20 @@ export const useFileOperations = ({
         return;
       }
 
-      void scanTagsForEntries(entries, tagRequestId);
+      void scanTagsForEntries(filteredEntries, tagRequestId);
     }, 100);
-  }, [scanTagsForEntries, setCurrentFolder, setExpandedFolders, setFolderContents, sortEntries]);
+  }, [scanTagsForEntries, setCurrentFolder, setExpandedFolders, setFolderContents, sortEntries, showHiddenFiles, hiddenFilesWhitelist]);
 
   const getSubfolderContents = useCallback(async (folderPath) => {
     try {
       const entries = await getCachedFileTree(folderPath, readDir);
-      return sortEntries(entries);
+      const filteredEntries = filterHiddenFiles(entries, showHiddenFiles, hiddenFilesWhitelist);
+      return sortEntries(filteredEntries);
     } catch (error) {
       console.error('读取子文件夹失败:', error);
       return [];
     }
-  }, [sortEntries]);
+  }, [sortEntries, showHiddenFiles, hiddenFilesWhitelist]);
 
   const openFileInEditor = useCallback(async (filePath, options = {}) => {
     const { revealInSidebar = true } = options;

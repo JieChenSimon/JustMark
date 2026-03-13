@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FileTreeItem, InlineCreateRow } from './FileTreeItem';
-import { IconDocument, IconListTree, IconMoon, IconPreview, IconSun, IconTableOfContents, IconClip, IconSync } from '../icons/AppIcons';
+import { IconDocument, IconListTree, IconMoon, IconPreview, IconSun, IconTableOfContents, IconClip, IconSync, IconSearch } from '../icons/AppIcons';
 import { useWebDAVSync } from '../../hooks/useWebDAVSync';
 
 export default function SidebarPanel({
@@ -52,6 +52,7 @@ export default function SidebarPanel({
   lines,
   onClipUrl,
   isClipping,
+  onToggleSearch,
 }) {
   const [activePage, setActivePage] = useState('files');
   const { isSyncing, syncProgress, startSync, cancelSync } = useWebDAVSync();
@@ -93,7 +94,7 @@ export default function SidebarPanel({
     <aside
       ref={setSidebarRef}
       style={{ width: `${sidebarWidth}px` }}
-      className={`jm-panel jm-sidebar overflow-y-auto overflow-x-hidden transition-colors ${rootDropActive ? 'bg-blue-500/6 dark:bg-blue-400/8' : ''}`}
+      className={`jm-panel jm-sidebar h-full overflow-y-auto overflow-x-hidden transition-colors ${rootDropActive ? 'bg-blue-500/6 dark:bg-blue-400/8' : ''}`}
       tabIndex={0}
       onDragOver={handleSidebarDragOver}
       onDrop={handleSidebarDrop}
@@ -226,8 +227,8 @@ export default function SidebarPanel({
             </section>
           )}
         </div>
-        <div className="mt-2 flex items-end justify-between border-t border-slate-200/60 px-1.5 pt-1.5 dark:border-slate-700/60">
-          <div className="flex items-center gap-1">
+        <div className="mt-1.5 flex flex-col border-t border-slate-200/60 px-1.5 pt-0.5 dark:border-slate-700/60">
+          <div className="flex items-center justify-center gap-1">
           <button
             type="button"
             onClick={isSyncing ? cancelSync : startSync}
@@ -259,6 +260,15 @@ export default function SidebarPanel({
             ) : (
               <IconSync className="h-3.5 w-3.5" />
             )}
+          </button>
+          <button
+            type="button"
+            onClick={onToggleSearch}
+            className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-700 transition-colors hover:bg-black/5 dark:text-slate-200 dark:hover:bg-white/5"
+            title="Global search (Cmd+Shift+F)"
+            aria-label="Global search"
+          >
+            <IconSearch className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
@@ -298,8 +308,18 @@ export default function SidebarPanel({
             <IconPreview className="h-3.5 w-3.5" />
           </button>
           </div>
-          <div className="pb-0.5 text-[8px] text-slate-400 dark:text-slate-500 tabular-nums whitespace-nowrap">
-            {chars.toLocaleString()} · {words.toLocaleString()}w · {lines.toLocaleString()}L
+          <div className="flex items-center justify-center gap-1.5 text-center text-[8px] text-slate-400 dark:text-slate-500">
+            {currentFilePath && (
+              <>
+                <span className="max-w-[100px] truncate font-medium text-slate-600 dark:text-slate-400">
+                  {currentFilePath.split('/').pop()}
+                </span>
+                <span>·</span>
+              </>
+            )}
+            <span className="tabular-nums">
+              {chars.toLocaleString()} · {words.toLocaleString()}w · {lines.toLocaleString()}L
+            </span>
           </div>
         </div>
       </div>

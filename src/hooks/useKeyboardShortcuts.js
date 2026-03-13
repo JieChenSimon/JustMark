@@ -61,6 +61,11 @@ export const useKeyboardShortcuts = (handlers) => {
         e.preventDefault();
         handlers.onPreferences();
       }
+      // Cmd+Shift+F - Global Search
+      else if (key === 'f' && withShift && handlers.onSearch) {
+        e.preventDefault();
+        handlers.onSearch();
+      }
       // Cmd+Shift+V - Paste Plain Text
       else if (key === 'v' && withShift && handlers.onPastePlain) {
         e.preventDefault();

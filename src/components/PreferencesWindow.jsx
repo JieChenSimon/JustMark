@@ -83,7 +83,11 @@ export default function PreferencesWindow() {
     autoSaveEnabled,
     setAutoSaveEnabled,
     fileSortBy,
-    setFileSortBy
+    setFileSortBy,
+    showHiddenFiles,
+    setShowHiddenFiles,
+    hiddenFilesWhitelist,
+    setHiddenFilesWhitelist
   } = useSettings();
 
   const [webdavUrl, setWebdavUrl] = useState('');
@@ -92,6 +96,7 @@ export default function PreferencesWindow() {
   const [webdavFolder, setWebdavFolder] = useState('/');
   const [webdavStatus, setWebdavStatus] = useState('');
   const [webdavConnected, setWebdavConnected] = useState(false);
+  const [newWhitelistItem, setNewWhitelistItem] = useState('');
 
   useEffect(() => {
     const config = localStorage.getItem('webdav_config');
@@ -272,6 +277,75 @@ export default function PreferencesWindow() {
                   hint="Persist changes automatically after editing named documents."
                   control={<Toggle checked={autoSaveEnabled} onChange={setAutoSaveEnabled} />}
                 />
+                <PreferenceRow
+                  label="Show Hidden Files"
+                  hint="Display files and folders starting with a dot (e.g., .git, .DS_Store)."
+                  control={<Toggle checked={showHiddenFiles} onChange={setShowHiddenFiles} />}
+                />
+                {!showHiddenFiles && (
+                  <PreferenceRow
+                    label="Hidden Files Whitelist"
+                    hint="Specific hidden files/folders to always show (e.g., .obsidian)."
+                    control={(
+                      <div className="w-full max-w-md space-y-2">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={newWhitelistItem}
+                            onChange={(e) => setNewWhitelistItem(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && newWhitelistItem.trim()) {
+                                e.preventDefault();
+                                const item = newWhitelistItem.trim();
+                                if (!hiddenFilesWhitelist.includes(item)) {
+                                  setHiddenFilesWhitelist([...hiddenFilesWhitelist, item]);
+                                }
+                                setNewWhitelistItem('');
+                              }
+                            }}
+                            className="flex-1 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-400 hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
+                            placeholder=".obsidian"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const item = newWhitelistItem.trim();
+                              if (item && !hiddenFilesWhitelist.includes(item)) {
+                                setHiddenFilesWhitelist([...hiddenFilesWhitelist, item]);
+                                setNewWhitelistItem('');
+                              }
+                            }}
+                            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900 shadow-sm transition-colors hover:border-gray-400 hover:bg-gray-50"
+                          >
+                            Add
+                          </button>
+                        </div>
+                        {hiddenFilesWhitelist.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {hiddenFilesWhitelist.map((item) => (
+                              <div
+                                key={item}
+                                className="flex items-center gap-1.5 rounded-md border border-gray-300 bg-gray-50 px-2 py-1 text-[12px] text-slate-700"
+                              >
+                                <span className="font-mono">{item}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setHiddenFilesWhitelist(hiddenFilesWhitelist.filter((i) => i !== item));
+                                  }}
+                                  className="text-slate-400 hover:text-slate-600"
+                                  title="Remove"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  />
+                )}
               </PreferenceSection>
 
               <PreferenceSection
