@@ -2,6 +2,7 @@
 import { useState, useRef, useDeferredValue, useCallback, useMemo, useEffect } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
+import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { useTheme } from './hooks/useTheme';
 import { useSettings } from './hooks/useSettings';
 import { useWindowManager } from './hooks/useWindowManager';
@@ -36,7 +37,21 @@ import { createUniqueHeadingId, extractTocHeadings, flattenReactNodeText, getLin
 import { bringAllToFront, openDocumentWindow, openPreferencesWindow } from './utils/windows';
 
 function App() {
-  const [markdown, setMarkdown] = useState('### JustMark\nWrite in a single way...');
+  // Multi-file tab state
+  const [openFiles, setOpenFiles] = useLocalStorage('openFiles', []);
+  const [activeFilePath, setActiveFilePath] = useLocalStorage('activeFilePath', null);
+
+  // Derived state from openFiles
+  const activeFile = openFiles.find(f => f.path === activeFilePath);
+  const markdown = activeFile?.content || '### JustMark\nWrite in a single way...';
+  const hasUnsavedChanges = activeFile ? activeFile.content !== activeFile.savedContent : false;
+  const currentFilePath = activeFilePath;
+
+  // Update refs when markdown changes
+  useEffect(() => {
+    markdownRef.current = markdown;
+  }, [markdown]);
+
   const markdownRef = useRef(markdown);
   const savedMarkdownRef = useRef(markdown);
   const didRestoreRef = useRef(false);
@@ -78,8 +93,6 @@ function App() {
   const { width: editorWidth, isDragging, handleMouseDown } = useResizable(50, 30, 70);
   const { clipFromSelection, isClipping } = useWebClipper();
 
-  const [currentFilePath, setCurrentFilePath] = useLocalStorage('currentFilePath', null);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [currentFolder, setCurrentFolder] = useLocalStorage('currentFolder', null);
   const [folderContents, setFolderContents] = useState([]);
   const [expandedFolders, setExpandedFolders] = useState(new Set());
@@ -132,6 +145,18 @@ function App() {
     };
   }, [deferredMarkdown]);
 
+  const setActiveMarkdown = useCallback((nextMarkdown) => {
+    markdownRef.current = nextMarkdown;
+
+    if (!activeFilePath) {
+      return;
+    }
+
+    setOpenFiles((prev) => prev.map((file) => (
+      file.path === activeFilePath ? { ...file, content: nextMarkdown } : file
+    )));
+  }, [activeFilePath, setOpenFiles]);
+
   // Auto-initialize WebDAV on app start
   useEffect(() => {
     const config = localStorage.getItem('webdav_config');
@@ -149,22 +174,135 @@ function App() {
 
   const { handleMarkdownChange, handleFormatText, handleImagePasted } = useMarkdownEditor({
     markdown,
-    setMarkdown,
+    setMarkdown: setActiveMarkdown,
     markdownRef
   });
+
+  // Tab management functions
+  const openFileInTab = useCallback(async (filePath, content) => {
+    // Check if already open
+    const existingFile = openFiles.find(f => f.path === filePath);
+    if (existingFile) {
+      setActiveFilePath(filePath);
+      return;
+    }
+
+    // Check file limit
+    if (openFiles.length >= 10) {
+      setDragNotice({
+        mode: 'info',
+        title: 'Tab Limit Reached',
+        message: 'Maximum 10 files can be open at once. Close some tabs to open more files.',
+      });
+      return;
+    }
+
+    // Add new file
+    const newFile = {
+      path: filePath,
+      content,
+      savedContent: content,
+      cursorPosition: 0,
+      scrollTop: 0
+    };
+
+    setOpenFiles(prev => [...prev, newFile]);
+    setActiveFilePath(filePath);
+  }, [openFiles, setOpenFiles, setActiveFilePath, setDragNotice]);
+
+  const switchToFile = useCallback((filePath) => {
+    // Save current file's cursor and scroll position
+    if (activeFilePath && editorAreaRef.current) {
+      const textarea = editorAreaRef.current.getTextareaElement?.();
+      if (textarea) {
+        setOpenFiles(prev => prev.map(f =>
+          f.path === activeFilePath
+            ? { ...f, cursorPosition: textarea.selectionStart, scrollTop: textarea.scrollTop }
+            : f
+        ));
+      }
+    }
+
+    // Switch to target file
+    setActiveFilePath(filePath);
+  }, [activeFilePath, setOpenFiles, setActiveFilePath]);
+
+  const closeFile = useCallback(async (filePath) => {
+    const file = openFiles.find(f => f.path === filePath);
+
+    // Check for unsaved changes
+    if (file && file.content !== file.savedContent) {
+      return new Promise((resolve) => {
+        setDragNotice({
+          mode: 'confirm',
+          title: 'Unsaved Changes',
+          message: `Do you want to save changes to "${file.path.split('/').pop()}"?`,
+          confirmText: 'Save',
+          secondaryText: "Don't Save",
+          cancelText: 'Cancel',
+          onConfirm: async () => {
+            await saveFile(filePath);
+            setDragNotice(null);
+            closeFileInternal(filePath);
+            resolve(true);
+          },
+          onSecondary: () => {
+            setDragNotice(null);
+            closeFileInternal(filePath);
+            resolve(true);
+          },
+          onCancel: () => {
+            setDragNotice(null);
+            resolve(false);
+          }
+        });
+      });
+    }
+
+    closeFileInternal(filePath);
+    return true;
+  }, [openFiles, setDragNotice]);
+
+  const closeFileInternal = useCallback((filePath) => {
+    const newOpenFiles = openFiles.filter(f => f.path !== filePath);
+    setOpenFiles(newOpenFiles);
+
+    // If closing active file, switch to adjacent file
+    if (filePath === activeFilePath) {
+      const index = openFiles.findIndex(f => f.path === filePath);
+      const nextFile = newOpenFiles[index] || newOpenFiles[index - 1] || null;
+      setActiveFilePath(nextFile?.path || null);
+    }
+  }, [openFiles, activeFilePath, setOpenFiles, setActiveFilePath]);
+
+  const saveFile = useCallback(async (filePath) => {
+    const file = openFiles.find(f => f.path === filePath);
+    if (!file) return;
+
+    await writeTextFile(filePath, file.content);
+
+    // Update savedContent
+    setOpenFiles(prev => prev.map(f =>
+      f.path === filePath ? { ...f, savedContent: f.content } : f
+    ));
+  }, [openFiles, setOpenFiles]);
 
   const persistSavedMarkdown = useCallback((content) => {
     savedMarkdownRef.current = content;
     markdownRef.current = content;
-  }, []);
+
+    // Update savedContent for active file
+    if (activeFilePath) {
+      setOpenFiles(prev => prev.map(f =>
+        f.path === activeFilePath ? { ...f, savedContent: content } : f
+      ));
+    }
+  }, [activeFilePath, setOpenFiles]);
 
   const fileOps = useFileOperations({
-    markdown,
     currentFilePath,
     currentFolder,
-    setMarkdown,
-    setCurrentFilePath,
-    setHasUnsavedChanges,
+    setHasUnsavedChanges: () => {}, // No longer needed, derived from state
     addRecentFile,
     setCurrentFolder,
     setFolderContents,
@@ -176,23 +314,29 @@ function App() {
     onPersistMarkdown: persistSavedMarkdown,
     getTagColor,
     showHiddenFiles,
-    hiddenFilesWhitelist
+    hiddenFilesWhitelist,
+    openFileInTab,
+    saveFile,
+    closeFile,
+    openFiles,
+    setOpenFiles,
+    setActiveFilePath
   });
 
   const handleNewFile = useCallback(() => {
-    setMarkdown('');
-    setCurrentFilePath(null);
-    setHasUnsavedChanges(false);
+    // Close all tabs and reset
+    setOpenFiles([]);
+    setActiveFilePath(null);
     persistSavedMarkdown('');
-  }, [persistSavedMarkdown, setCurrentFilePath]);
+  }, [persistSavedMarkdown, setOpenFiles, setActiveFilePath]);
 
   const saveCurrentDocument = useCallback(async () => {
-    if (currentFilePath) {
+    if (activeFilePath) {
       return fileOps.handleSave();
     }
 
     return Boolean(await fileOps.handleSaveAs());
-  }, [currentFilePath, fileOps]);
+  }, [activeFilePath, fileOps]);
 
   const {
     unsavedNotice,
@@ -309,7 +453,7 @@ function App() {
     }
 
     try {
-      await clipFromSelection(textarea, markdown, setMarkdown, setHasUnsavedChanges);
+      await clipFromSelection(textarea, markdown, setActiveMarkdown, () => {});
       markdownRef.current = textarea.value;
     } catch (error) {
       setDragNotice({
@@ -318,7 +462,7 @@ function App() {
         message: error?.message || 'The selected content could not be clipped.',
       });
     }
-  }, [clipFromSelection, markdown, setHasUnsavedChanges]);
+  }, [clipFromSelection, markdown, setActiveMarkdown]);
 
   const {
     selectedSidebarPath,
@@ -411,7 +555,6 @@ function App() {
     markdown,
     restoreOnceRef: didRestoreRef,
     savedMarkdownRef,
-    setHasUnsavedChanges,
   });
 
   useAppMenu({
@@ -538,13 +681,21 @@ function App() {
 
         <div
           onMouseDown={sidebarVisible ? () => setIsDraggingSidebar(true) : undefined}
-          className={`flex-shrink-0 cursor-col-resize hover:bg-blue-500/50 ${shouldAnimateLayout ? 'transition-[width,opacity,background-color] duration-300 ease-out' : 'transition-colors'} ${isDraggingSidebar ? 'bg-blue-500' : ''}`}
+          className={`flex-shrink-0 flex justify-center cursor-col-resize ${shouldAnimateLayout ? 'transition-[width,opacity] duration-300 ease-out' : ''}`}
           style={{
-            width: sidebarVisible ? '3px' : '0px',
+            width: sidebarVisible ? '6px' : '0px',
             opacity: sidebarVisible ? 1 : 0,
             pointerEvents: sidebarVisible ? 'auto' : 'none',
           }}
-        />
+        >
+          <div
+            className={`h-full w-px transition-colors duration-200 ${
+              isDraggingSidebar
+                ? 'bg-blue-500'
+                : 'bg-slate-200/70 dark:bg-white/10'
+            }`}
+          />
+        </div>
 
         <section
           style={{ width: previewVisible ? `${editorWidth}%` : '100%' }}
@@ -568,6 +719,11 @@ function App() {
             chars={chars}
             words={words}
             lines={lines}
+            openFiles={openFiles}
+            activeFilePath={activeFilePath}
+            onSwitchFile={switchToFile}
+            onCloseFile={closeFile}
+            onNewFile={handleNewFile}
           />
         </section>
 
@@ -655,7 +811,7 @@ function App() {
         onClose={() => setSearchOpen(false)}
         currentFolder={currentFolder}
         folderContents={folderContents}
-        onOpenFile={(path) => fileOps.openFileInEditor(path, { revealInSidebar: false })}
+        onOpenFile={(path) => fileOps.openFileInEditor(path, { revealInSidebar: true })}
         getSubfolderContents={fileOps.getSubfolderContents}
       />
 

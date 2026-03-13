@@ -19,11 +19,8 @@ async function copyEntryRecursive(sourcePath, targetPath) {
 }
 
 export const useFileOperations = ({
-  markdown,
   currentFilePath,
   currentFolder,
-  setMarkdown,
-  setCurrentFilePath,
   setHasUnsavedChanges,
   addRecentFile,
   setCurrentFolder,
@@ -36,7 +33,13 @@ export const useFileOperations = ({
   onPersistMarkdown,
   getTagColor,
   showHiddenFiles,
-  hiddenFilesWhitelist
+  hiddenFilesWhitelist,
+  openFileInTab,
+  saveFile,
+  closeFile,
+  openFiles,
+  setOpenFiles,
+  setActiveFilePath
 }) => {
   const isMountedRef = useRef(true);
   const folderLoadRequestRef = useRef(0);
@@ -88,11 +91,11 @@ export const useFileOperations = ({
   ), []);
 
   const clearEditorState = useCallback(() => {
-    setCurrentFilePath(null);
-    setMarkdown('');
-    onPersistMarkdown('');
-    setHasUnsavedChanges(false);
-  }, [onPersistMarkdown, setCurrentFilePath, setHasUnsavedChanges, setMarkdown]);
+    // Close all tabs
+    if (openFiles && openFiles.length > 0) {
+      openFiles.forEach(file => closeFile(file.path));
+    }
+  }, [openFiles, closeFile]);
 
   const scanTagsForEntries = useCallback(async (entries, requestId) => {
     const mdFiles = entries.filter((item) => !item.isDirectory && item.name?.endsWith('.md'));
@@ -185,6 +188,30 @@ export const useFileOperations = ({
     }
   }, [sortEntries, showHiddenFiles, hiddenFilesWhitelist]);
 
+  const revealFileInSidebar = useCallback((filePath) => {
+    if (!currentFolder || !filePath.startsWith(currentFolder)) {
+      return;
+    }
+
+    // 获取从 currentFolder 到文件的所有父文件夹路径
+    const relativePath = filePath.slice(currentFolder.length + 1);
+    const segments = relativePath.split('/');
+    segments.pop(); // 移除文件名，只保留文件夹路径
+
+    // 展开所有父文件夹
+    setExpandedFolders((prev) => {
+      const next = new Set(prev);
+      let currentPath = currentFolder;
+
+      for (const segment of segments) {
+        currentPath = `${currentPath}/${segment}`;
+        next.add(currentPath);
+      }
+
+      return next;
+    });
+  }, [currentFolder, setExpandedFolders]);
+
   const openFileInEditor = useCallback(async (filePath, options = {}) => {
     const { revealInSidebar = true } = options;
     const requestId = fileOpenRequestRef.current + 1;
@@ -196,17 +223,10 @@ export const useFileOperations = ({
       }
 
       setPreviewFilePath(filePath);
-      setCurrentFilePath(filePath);
-      setMarkdown('');
-      onPersistMarkdown('');
-      setHasUnsavedChanges(false);
       addRecentFile(filePath);
 
       if (revealInSidebar) {
-        const folderPath = getParentPath(filePath);
-        if (folderPath) {
-          await loadFolderContents(folderPath, { preserveExpanded: true });
-        }
+        revealFileInSidebar(filePath);
       }
       return;
     }
@@ -218,50 +238,45 @@ export const useFileOperations = ({
       return;
     }
 
-    setMarkdown(content);
-    onPersistMarkdown(content);
-    setCurrentFilePath(filePath);
-    setHasUnsavedChanges(false);
+    // Open in tab
+    await openFileInTab(filePath, content);
     addRecentFile(filePath);
 
     if (revealInSidebar) {
-      const folderPath = getParentPath(filePath);
-      if (folderPath) {
-        await loadFolderContents(folderPath, { preserveExpanded: true });
-      }
+      revealFileInSidebar(filePath);
     }
   }, [
     addRecentFile,
-    getParentPath,
     isEditableTextPath,
-    loadFolderContents,
-    onPersistMarkdown,
-    setCurrentFilePath,
-    setHasUnsavedChanges,
-    setMarkdown,
-    setPreviewFilePath
+    revealFileInSidebar,
+    setPreviewFilePath,
+    openFileInTab
   ]);
 
   const handleSave = useCallback(async () => {
     if (!currentFilePath || !isEditableTextPath(currentFilePath)) return false;
 
-    await writeTextFile(currentFilePath, markdown);
-    onPersistMarkdown(markdown);
-    setHasUnsavedChanges(false);
+    await saveFile(currentFilePath);
     return true;
-  }, [currentFilePath, isEditableTextPath, markdown, onPersistMarkdown, setHasUnsavedChanges]);
+  }, [currentFilePath, isEditableTextPath, saveFile]);
 
   const handleSaveAs = useCallback(async () => {
+    const activeFile = openFiles?.find(f => f.path === currentFilePath);
+    const content = activeFile?.content || '';
+
     const filePath = await save({
       defaultPath: isEditableTextPath(currentFilePath) ? currentFilePath : 'untitled.md',
       filters: [{ name: 'Markdown', extensions: ['md'] }]
     });
     if (!filePath) return null;
 
-    await writeTextFile(filePath, markdown);
-    onPersistMarkdown(markdown);
-    setCurrentFilePath(filePath);
-    setHasUnsavedChanges(false);
+    await writeTextFile(filePath, content);
+
+    // Update the tab with new path
+    if (openFileInTab) {
+      await openFileInTab(filePath, content);
+    }
+
     addRecentFile(filePath);
 
     const folderPath = getParentPath(filePath);
@@ -275,11 +290,9 @@ export const useFileOperations = ({
     currentFilePath,
     getParentPath,
     loadFolderContents,
-    markdown,
-    onPersistMarkdown,
     isEditableTextPath,
-    setCurrentFilePath,
-    setHasUnsavedChanges
+    openFiles,
+    openFileInTab
   ]);
 
   const handleOpenFile = useCallback(async () => {
@@ -311,19 +324,19 @@ export const useFileOperations = ({
       return next;
     });
 
-    if (currentFilePath === targetPath) {
-      clearEditorState();
+    // Close tab if file is open
+    if (closeFile) {
+      await closeFile(targetPath);
     }
 
     if (currentFolder) {
       await loadFolderContents(currentFolder, { preserveExpanded: true });
     }
   }, [
-    clearEditorState,
-    currentFilePath,
     currentFolder,
     loadFolderContents,
     setFileTags,
+    closeFile
   ]);
 
   const createEntry = useCallback(async (path, isDirectory) => {
@@ -350,14 +363,22 @@ export const useFileOperations = ({
 
     setFileTags((prev) => rewriteMappedPaths(prev, oldPath, newPath));
 
-    if (currentFilePath === oldPath || currentFilePath?.startsWith(`${oldPath}/`)) {
-      setCurrentFilePath((prev) => (prev ? updatePathPrefix(prev, oldPath, newPath) : prev));
+    // Update tab paths if file is open
+    if (openFiles) {
+      const fileToUpdate = openFiles.find(f => f.path === oldPath);
+      if (fileToUpdate) {
+        if (openFileInTab) {
+          // Close old tab and open with new path
+          await closeFile(oldPath);
+          await openFileInTab(newPath, fileToUpdate.content);
+        }
+      }
     }
 
     if (currentFolder) {
       await loadFolderContents(currentFolder, { preserveExpanded: true });
     }
-  }, [currentFilePath, currentFolder, getParentPath, loadFolderContents, rewriteMappedPaths, setCurrentFilePath, setFileTags, updatePathPrefix]);
+  }, [currentFolder, getParentPath, loadFolderContents, rewriteMappedPaths, setFileTags, updatePathPrefix, openFiles, openFileInTab, closeFile]);
 
   const moveEntry = useCallback(async (sourcePath, targetFolderPath, options = {}) => {
     const { overwrite = false } = options;
@@ -384,7 +405,12 @@ export const useFileOperations = ({
     });
 
     if (currentFilePath === sourcePath || currentFilePath?.startsWith(`${sourcePath}/`)) {
-      setCurrentFilePath((prev) => (prev ? updatePathPrefix(prev, sourcePath, nextPath) : prev));
+      setOpenFiles?.((prev) => prev.map((file) => (
+        file.path === sourcePath || file.path.startsWith(`${sourcePath}/`)
+          ? { ...file, path: updatePathPrefix(file.path, sourcePath, nextPath) }
+          : file
+      )));
+      setActiveFilePath?.((prev) => (prev ? updatePathPrefix(prev, sourcePath, nextPath) : prev));
     } else if (targetExists && overwrite && (currentFilePath === nextPath || currentFilePath?.startsWith(`${nextPath}/`))) {
       clearEditorState();
     }
@@ -402,7 +428,8 @@ export const useFileOperations = ({
     loadFolderContents,
     removeMappedPrefix,
     rewriteMappedPaths,
-    setCurrentFilePath,
+    setActiveFilePath,
+    setOpenFiles,
     setFileTags,
     updatePathPrefix
   ]);

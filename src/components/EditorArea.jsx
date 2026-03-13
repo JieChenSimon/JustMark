@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import SearchReplace from './SearchReplace';
+import FileTabs from './FileTabs';
 import { useImagePaste } from '../hooks/useImagePaste';
 import { IconDocument, IconSidebar } from './icons/AppIcons';
 
 /**
  * 编辑器区域组件
- * 包含 textarea 编辑器和左下角的控制按钮（文件浏览器、Git 管理）
+ * 包含 FileTabs、textarea 编辑器和左下角的控制按钮
  */
 const EditorArea = forwardRef(({
   markdown,
@@ -24,12 +25,20 @@ const EditorArea = forwardRef(({
   onImagePasted,
   chars,
   words,
-  lines
+  lines,
+  // Tab props
+  openFiles,
+  activeFilePath,
+  onSwitchFile,
+  onCloseFile,
+  onNewFile
 }, ref) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const textareaRef = useRef(null);
   const searchReplaceRef = useRef(null);
+  const lastRestoredPathRef = useRef(null);
   const { handlePaste: handleImagePaste } = useImagePaste(currentFolder, currentFilePath);
+  const hasTabs = Boolean(openFiles?.length);
 
   const openSearch = (mode = 'find') => {
     setSearchOpen(true);
@@ -156,6 +165,29 @@ const EditorArea = forwardRef(({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [searchOpen]);
 
+  // 恢复光标和滚动位置
+  useEffect(() => {
+    if (!activeFilePath || !openFiles || !textareaRef.current) return;
+    if (lastRestoredPathRef.current === activeFilePath) return;
+
+    const activeFile = openFiles.find(f => f.path === activeFilePath);
+    if (!activeFile) return;
+
+    const textarea = textareaRef.current;
+    lastRestoredPathRef.current = activeFilePath;
+    requestAnimationFrame(() => {
+      textarea.selectionStart = activeFile.cursorPosition || 0;
+      textarea.selectionEnd = activeFile.cursorPosition || 0;
+      textarea.scrollTop = activeFile.scrollTop || 0;
+    });
+  }, [activeFilePath, openFiles]);
+
+  useEffect(() => {
+    if (!activeFilePath) {
+      lastRestoredPathRef.current = null;
+    }
+  }, [activeFilePath]);
+
   return (
     <div
       className="jm-editor-surface relative flex h-full min-h-0 flex-1 flex-col overflow-hidden"
@@ -163,7 +195,7 @@ const EditorArea = forwardRef(({
     >
       <textarea
         ref={textareaRef}
-        className={`min-h-0 flex-1 resize-none bg-transparent px-8 pb-24 pt-8 outline-none placeholder-gray-300 dark:placeholder-gray-600 ${currentFont.size} ${currentFont.leading}`}
+        className={`min-h-0 flex-1 resize-none bg-transparent px-8 pb-16 pt-8 outline-none placeholder-gray-300 dark:placeholder-gray-600 ${currentFont.size} ${currentFont.leading}`}
         style={{
           fontFamily: currentFontFamily.family,
           color: appTextColor
@@ -190,8 +222,19 @@ const EditorArea = forwardRef(({
         }}
         textareaRef={textareaRef}
       />
+
+      {hasTabs && (
+        <FileTabs
+          openFiles={openFiles}
+          activeFilePath={activeFilePath}
+          onSwitchFile={onSwitchFile}
+          onCloseFile={onCloseFile}
+          onNewFile={onNewFile}
+        />
+      )}
+
       {currentFolder && (
-        <div className="absolute bottom-4 left-4 z-20">
+        <div className={`absolute left-4 z-20 ${hasTabs ? 'bottom-10' : 'bottom-4'}`}>
           <button
             onClick={() => onToggleSidebar(!sidebarVisible)}
             className={`flex h-7 w-7 items-center justify-center rounded-lg backdrop-blur-md transition-all duration-200 ${

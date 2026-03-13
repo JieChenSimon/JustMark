@@ -13,13 +13,8 @@ export function useDocumentLifecycle({
   markdown,
   restoreOnceRef,
   savedMarkdownRef,
-  setHasUnsavedChanges,
 }) {
   const isEditableTextPath = (path) => !path || /\.(md|markdown|txt)$/i.test(path);
-
-  useEffect(() => {
-    setHasUnsavedChanges(isEditableTextPath(currentFilePath) && markdown !== savedMarkdownRef.current);
-  }, [currentFilePath, markdown, savedMarkdownRef, setHasUnsavedChanges]);
 
   useEffect(() => {
     if (!autoSaveEnabled || !hasUnsavedChanges || !currentFilePath || !isEditableTextPath(currentFilePath)) return undefined;
