@@ -96,7 +96,9 @@
             "fs:allow-read-file",
             "fs:allow-stat",
             "fs:allow-lstat",
-            "fs:allow-fstat"
+            "fs:allow-fstat",
+            "http:default",
+            "http:allow-fetch"
           ]
         }
       ]
@@ -111,7 +113,11 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "entitlements": "JustMark.entitlements",
+      "infoFile": "Info.plist"
+    }
   },
   "plugins": {
     "opener": {}

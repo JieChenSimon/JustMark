@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- 允许HTTP和HTTPS连接 -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <!-- 允许任意加载（包括HTTP） -->
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+        <!-- 或者更安全的方式：只允许特定域名 -->
+        <!--
+        <key>NSExceptionDomains</key>
+        <dict>
+            <key>your-webdav-server.com</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <true/>
+                <key>NSIncludesSubdomains</key>
+                <true/>
+            </dict>
+        </dict>
+        -->
+    </dict>
+</dict>
+</plist>
