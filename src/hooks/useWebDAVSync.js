@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
-import { readDir, readTextFile, exists, stat } from '@tauri-apps/plugin-fs';
-import { hasWebDAVClient, uploadFile, listFiles, createDirectory } from '../utils/webdav';
+import { readDir, readTextFile, exists } from '@tauri-apps/plugin-fs';
+import { hasWebDAVClient, readSavedWebDAVConfig, uploadFile, listFiles, createDirectory } from '../utils/webdav';
 
 export function useWebDAVSync() {
   const [isSyncing, setIsSyncing] = useState(false);
@@ -60,7 +60,12 @@ export function useWebDAVSync() {
         return;
       }
 
-      const config = JSON.parse(localStorage.getItem('webdav_config') || '{}');
+      const config = readSavedWebDAVConfig();
+      if (!config) {
+        console.warn('[Sync] WebDAV配置无效');
+        return;
+      }
+
       const remoteFolder = (config.folder || '/').replace(/\/$/, '');
 
       const files = await readDirRecursive(currentFolder, currentFolder);

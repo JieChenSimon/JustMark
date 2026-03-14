@@ -20,7 +20,6 @@ import { useInlineCreate } from './hooks/useInlineCreate';
 import { useNoticeDialog } from './hooks/useNoticeDialog';
 import { useUnsavedChangesGuard } from './hooks/useUnsavedChangesGuard';
 import { useWebClipper } from './hooks/useWebClipper';
-import { initWebDAV } from './utils/webdav';
 import EditorArea from './components/EditorArea';
 import MarkdownPreview from './components/preview/MarkdownPreview';
 import PDFPreview from './components/preview/PDFPreview';
@@ -156,21 +155,6 @@ function App() {
       file.path === activeFilePath ? { ...file, content: nextMarkdown } : file
     )));
   }, [activeFilePath, setOpenFiles]);
-
-  // Auto-initialize WebDAV on app start
-  useEffect(() => {
-    const config = localStorage.getItem('webdav_config');
-    if (config) {
-      try {
-        const { url, username, password, folder, connected } = JSON.parse(config);
-        if (connected && url && username && password) {
-          initWebDAV(url, username, password, folder || '/');
-        }
-      } catch (error) {
-        console.error('Failed to auto-initialize WebDAV:', error);
-      }
-    }
-  }, []);
 
   const { handleMarkdownChange, handleFormatText, handleImagePasted } = useMarkdownEditor({
     markdown,

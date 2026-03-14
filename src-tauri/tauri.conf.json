@@ -116,7 +116,7 @@
     ],
     "macOS": {
       "entitlements": "JustMark.entitlements",
-      "infoFile": "Info.plist"
+      "infoPlist": "Info.plist"
     }
   },
   "plugins": {

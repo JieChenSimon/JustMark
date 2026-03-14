@@ -3,7 +3,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useTheme } from '../hooks/useTheme';
 import { useSettings } from '../hooks/useSettings';
 import { BACKGROUND_COLORS, FONT_FAMILIES, FONT_OPTIONS } from '../constants/theme';
-import { initWebDAV } from '../utils/webdav';
+import { initWebDAV, readSavedWebDAVConfig, saveWebDAVConfig, testConnection } from '../utils/webdav';
 
 const PREFERENCE_SECTIONS = [
   {
@@ -99,20 +99,13 @@ export default function PreferencesWindow() {
   const [newWhitelistItem, setNewWhitelistItem] = useState('');
 
   useEffect(() => {
-    const config = localStorage.getItem('webdav_config');
-    if (config) {
-      try {
-        const parsed = JSON.parse(config);
-        if (parsed) {
-          setWebdavUrl(parsed.url || '');
-          setWebdavUsername(parsed.username || '');
-          setWebdavPassword(parsed.password || '');
-          setWebdavFolder(parsed.folder || '/');
-          setWebdavConnected(parsed.connected || false);
-        }
-      } catch (error) {
-        console.error('Failed to parse WebDAV config:', error);
-      }
+    const savedConfig = readSavedWebDAVConfig();
+    if (savedConfig) {
+      setWebdavUrl(savedConfig.url || '');
+      setWebdavUsername(savedConfig.username || '');
+      setWebdavPassword(savedConfig.password || '');
+      setWebdavFolder(savedConfig.folder || '/');
+      setWebdavConnected(savedConfig.connected || false);
     }
   }, []);
 
@@ -127,18 +120,16 @@ export default function PreferencesWindow() {
     }
 
     try {
-      const { testConnection } = await import('../utils/webdav');
-      await testConnection();
+      await testConnection(result.config);
 
-      const config = { url: webdavUrl, username: webdavUsername, password: webdavPassword, folder: webdavFolder, connected: true };
+      const config = saveWebDAVConfig({ ...result.config, connected: true });
       setWebdavConnected(true);
       setWebdavStatus('✅ Connected');
-      localStorage.setItem('webdav_config', JSON.stringify(config));
       setTimeout(() => setWebdavStatus(''), 3000);
     } catch (error) {
       console.error('[Connect] Test failed:', error);
       setWebdavConnected(false);
-      setWebdavStatus('❌ Failed: ' + error);
+      setWebdavStatus(`❌ Failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 

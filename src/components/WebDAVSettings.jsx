@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { initWebDAV } from '../utils/webdav';
+import { initWebDAV, saveWebDAVConfig, testConnection } from '../utils/webdav';
 
 export default function WebDAVSettings({ initialConfig, onClose, onSave }) {
   const [url, setUrl] = useState(initialConfig?.url || '');
@@ -9,14 +9,19 @@ export default function WebDAVSettings({ initialConfig, onClose, onSave }) {
 
   const handleConnect = async () => {
     const result = initWebDAV(url, username, password);
-    if (result.success) {
-      const config = { url, username, password };
+    if (!result.success) {
+      setStatus('❌ 连接失败: ' + result.error);
+      return;
+    }
+
+    try {
+      await testConnection(result.config);
+      const config = saveWebDAVConfig({ ...result.config, connected: true });
       setStatus('✅ 连接成功');
-      localStorage.setItem('webdav_config', JSON.stringify(config));
       onSave?.(config);
       setTimeout(onClose, 1000);
-    } else {
-      setStatus('❌ 连接失败: ' + result.error);
+    } catch (error) {
+      setStatus(`❌ 连接失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
