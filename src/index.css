@@ -72,11 +72,22 @@
 
   .jm-button:hover {
     background: rgba(0, 0, 0, 0.04);
+    transform: translateY(-1px);
   }
 
   .jm-button:active {
     background: rgba(0, 0, 0, 0.06);
     transform: scale(0.985);
+  }
+
+  .jm-button:focus-visible {
+    outline: 2px solid var(--jm-accent);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px var(--jm-accent-soft);
+  }
+
+  .jm-button:focus:not(:focus-visible) {
+    outline: none;
   }
 
   .jm-button-primary {
@@ -173,6 +184,7 @@
 
 .dark .jm-button:hover {
   background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-1px);
 }
 
 .dark .jm-button:active {
@@ -198,12 +210,33 @@
   scrollbar-gutter: stable;
 }
 
+@keyframes jm-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .jm-markdown-preview {
   line-height: 1.75;
 }
 
+.jm-markdown-preview > * {
+  animation: jm-fade-in 0.2s cubic-bezier(0.37, 0.55, 0.86, 0.88) both;
+}
+
 .jm-markdown-preview > :first-child {
   margin-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jm-markdown-preview > * {
+    animation: none;
+  }
 }
 
 .jm-markdown-preview h1,

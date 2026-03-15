@@ -55,8 +55,11 @@ export default function SidebarPanel({
   onToggleSearch,
 }) {
   const [activePage, setActivePage] = useState('files');
-  const { isSyncing, syncProgress, startSync, cancelSync } = useWebDAVSync();
+  const { isSyncing, syncProgress, startSync, cancelSync, lastSyncSummary, lastSyncAt, syncMode } = useWebDAVSync(currentFolder);
   const isTextDocument = !currentFilePath || /\.(md|markdown|txt)$/i.test(currentFilePath);
+  const syncTimestampLabel = lastSyncAt
+    ? new Intl.DateTimeFormat([], { hour: '2-digit', minute: '2-digit' }).format(new Date(lastSyncAt))
+    : null;
 
   useEffect(() => {
     const shouldDebug = import.meta.env.DEV && (
@@ -229,17 +232,17 @@ export default function SidebarPanel({
         </div>
         <div className="mt-1.5 flex flex-col border-t border-slate-200/60 px-1.5 pt-0.5 dark:border-slate-700/60">
           <div className="flex items-center justify-center gap-1">
-          <button
-            type="button"
-            onClick={isSyncing ? cancelSync : startSync}
-            className={`relative flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
-              isSyncing
-                ? 'text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20'
-                : 'text-slate-700 hover:bg-black/5 dark:text-slate-200 dark:hover:bg-white/5'
-            }`}
-            title={isSyncing ? `Syncing... ${syncProgress}%` : 'Sync with WebDAV'}
-            aria-label={isSyncing ? 'Cancel sync' : 'Start sync'}
-          >
+          <div className="group relative">
+            <button
+              type="button"
+              onClick={isSyncing ? cancelSync : startSync}
+              className={`relative flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+                isSyncing
+                  ? 'text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20'
+                  : 'text-slate-700 hover:bg-black/5 dark:text-slate-200 dark:hover:bg-white/5'
+              }`}
+              aria-label={isSyncing ? 'Cancel sync' : 'Start sync'}
+            >
             {isSyncing ? (
               <>
                 <span className="text-[7px] font-semibold">{syncProgress}%</span>
@@ -261,6 +264,12 @@ export default function SidebarPanel({
               <IconSync className="h-3.5 w-3.5" />
             )}
           </button>
+          <div className="pointer-events-none absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 group-hover:delay-500">
+            <div className="whitespace-nowrap rounded-md bg-slate-900/95 px-2 py-1 text-[10px] text-white shadow-lg backdrop-blur-xl dark:bg-slate-800/95">
+              {isSyncing ? `${syncProgress}% ${lastSyncSummary || ''}` : (lastSyncSummary || 'WebDAV Sync')}
+            </div>
+          </div>
+        </div>
           <button
             type="button"
             onClick={onToggleSearch}

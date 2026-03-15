@@ -1,6 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
 
 export const WEBDAV_CONFIG_KEY = 'webdav_config';
+export const WEBDAV_CONFIG_CHANGED_EVENT = 'justmark:webdav-config-changed';
+
+let cachedConfig = null;
+let cachedConfigRaw = null;
+let hasLoadedConfig = false;
 
 const normalizeFolder = (folder = '/') => {
   const trimmed = (folder || '/').trim();
@@ -26,33 +31,46 @@ const normalizeConfig = (input) => {
   };
 };
 
-export const readSavedWebDAVConfig = () => {
-  try {
-    const raw = localStorage.getItem(WEBDAV_CONFIG_KEY);
-    if (!raw) {
-      return null;
-    }
+const applyCachedConfig = (rawValue) => {
+  hasLoadedConfig = true;
+  cachedConfigRaw = rawValue;
 
-    return normalizeConfig(JSON.parse(raw));
+  if (!rawValue) {
+    cachedConfig = null;
+    return null;
+  }
+
+  try {
+    cachedConfig = normalizeConfig(JSON.parse(rawValue));
+    return cachedConfig;
   } catch (error) {
     console.error('[WebDAV] Failed to read saved config:', error);
+    cachedConfig = null;
     return null;
   }
 };
 
-export const saveWebDAVConfig = (input) => {
-  const config = normalizeConfig(input);
-  localStorage.setItem(WEBDAV_CONFIG_KEY, JSON.stringify(config));
-  window.dispatchEvent(new CustomEvent('justmark:webdav-config-changed', { detail: config }));
-  return config;
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key === WEBDAV_CONFIG_KEY) {
+      applyCachedConfig(event.newValue);
+    }
+  });
+
+  window.addEventListener(WEBDAV_CONFIG_CHANGED_EVENT, (event) => {
+    applyCachedConfig(JSON.stringify(event.detail));
+  });
+}
+
+export const readSavedWebDAVConfig = () => {
+  if (hasLoadedConfig) {
+    return cachedConfig;
+  }
+
+  return applyCachedConfig(localStorage.getItem(WEBDAV_CONFIG_KEY));
 };
 
-export const clearWebDAVConfig = () => {
-  localStorage.removeItem(WEBDAV_CONFIG_KEY);
-  window.dispatchEvent(new CustomEvent('justmark:webdav-config-changed', { detail: null }));
-};
-
-export const initWebDAV = (url, username, password, folder = '/') => {
+export const prepareWebDAVConfig = (url, username, password, folder = '/') => {
   try {
     const config = normalizeConfig({ url, username, password, folder, connected: true });
 
@@ -62,9 +80,37 @@ export const initWebDAV = (url, username, password, folder = '/') => {
 
     return { success: true, config };
   } catch (error) {
-    console.error('[WebDAV] Init failed:', error);
+    console.error('[WebDAV] Config validation failed:', error);
     return { success: false, error: error.message };
   }
+};
+
+export const saveWebDAVConfig = (input) => {
+  const config = normalizeConfig(input);
+  const nextRaw = JSON.stringify(config);
+  const previousRaw = cachedConfigRaw ?? localStorage.getItem(WEBDAV_CONFIG_KEY);
+
+  if (previousRaw === nextRaw) {
+    applyCachedConfig(nextRaw);
+    return config;
+  }
+
+  localStorage.setItem(WEBDAV_CONFIG_KEY, nextRaw);
+  applyCachedConfig(nextRaw);
+  window.dispatchEvent(new CustomEvent(WEBDAV_CONFIG_CHANGED_EVENT, { detail: config }));
+  return config;
+};
+
+export const clearWebDAVConfig = () => {
+  localStorage.removeItem(WEBDAV_CONFIG_KEY);
+  hasLoadedConfig = true;
+  cachedConfig = null;
+  cachedConfigRaw = null;
+  window.dispatchEvent(new CustomEvent(WEBDAV_CONFIG_CHANGED_EVENT, { detail: null }));
+};
+
+export const initWebDAV = (url, username, password, folder = '/') => {
+  return prepareWebDAVConfig(url, username, password, folder);
 };
 
 const resolveConfig = (overrideConfig) => {
@@ -104,7 +150,8 @@ export const downloadFile = async (remotePath, overrideConfig) => {
 };
 
 export const deleteFile = async (remotePath) => {
-  throw new Error('Not implemented yet');
+  const config = resolveConfig();
+  return await invoke('webdav_delete_file', { config, remotePath });
 };
 
 export const createDirectory = async (remotePath, overrideConfig) => {

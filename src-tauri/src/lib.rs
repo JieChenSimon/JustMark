@@ -16,7 +16,8 @@ pub fn run() {
             webdav_command::webdav_list_files,
             webdav_command::webdav_upload_file,
             webdav_command::webdav_download_file,
-            webdav_command::webdav_create_directory
+            webdav_command::webdav_create_directory,
+            webdav_command::webdav_delete_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,18 +1,165 @@
-import { useState, useCallback, useRef } from 'react';
-import { readDir, readTextFile, exists } from '@tauri-apps/plugin-fs';
-import { hasWebDAVClient, readSavedWebDAVConfig, uploadFile, listFiles, createDirectory } from '../utils/webdav';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { readDir, readTextFile, exists, stat, mkdir, remove, writeTextFile } from '@tauri-apps/plugin-fs';
+import { hasWebDAVClient, readSavedWebDAVConfig, uploadFile, listFiles, createDirectory, downloadFile, deleteFile } from '../utils/webdav';
+import { useSettings } from './useSettings';
 
-export function useWebDAVSync() {
+const WEBDAV_SYNC_STATE_KEY = 'webdav_sync_state_v2';
+const SYNC_TOLERANCE_MS = 2000;
+
+const buildSnapshotKey = ({ currentFolder, remoteFolder, url, username }) => (
+  JSON.stringify({
+    currentFolder,
+    remoteFolder,
+    url,
+    username,
+  })
+);
+
+const normalizeRemoteFolderBase = (folder = '/') => {
+  const trimmed = (folder || '/').trim().replace(/\/+$/, '');
+  return trimmed && trimmed !== '/' ? trimmed : '';
+};
+
+const joinRemotePath = (base, relativePath) => {
+  const normalizedBase = normalizeRemoteFolderBase(base);
+  return normalizedBase ? `${normalizedBase}/${relativePath}` : `/${relativePath}`;
+};
+
+const getParentPath = (path) => {
+  const index = path.lastIndexOf('/');
+  return index > 0 ? path.slice(0, index) : '';
+};
+
+const ensureLocalParentDir = async (filePath) => {
+  const parent = getParentPath(filePath);
+  if (parent) {
+    await mkdir(parent, { recursive: true });
+  }
+};
+
+const safeDecodeRemotePath = (path) => {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+};
+
+const isTextSyncFile = (name) => /\.(md|markdown|txt)$/i.test(name);
+
+const readAllSyncSnapshots = () => {
+  try {
+    return JSON.parse(localStorage.getItem(WEBDAV_SYNC_STATE_KEY) || '{}');
+  } catch (error) {
+    console.error('[Sync] Failed to read sync snapshots:', error);
+    return {};
+  }
+};
+
+const writeAllSyncSnapshots = (snapshots) => {
+  localStorage.setItem(WEBDAV_SYNC_STATE_KEY, JSON.stringify(snapshots));
+};
+
+const createLocalSignature = (fileStat) => JSON.stringify({
+  size: fileStat.size,
+  mtime: fileStat.mtime ? new Date(fileStat.mtime).toISOString() : null,
+});
+
+const createRemoteSignature = (remoteFile) => JSON.stringify({
+  size: remoteFile.size ?? 0,
+  mtime: remoteFile.last_modified ?? null,
+});
+
+const parseSignature = (signature) => {
+  if (!signature) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(signature);
+  } catch {
+    return null;
+  }
+};
+
+const signaturesCloseEnough = (localSignature, remoteSignature) => {
+  const local = parseSignature(localSignature);
+  const remote = parseSignature(remoteSignature);
+
+  if (!local || !remote) {
+    return false;
+  }
+
+  const localTime = local.mtime ? Date.parse(local.mtime) : null;
+  const remoteTime = remote.mtime ? Date.parse(remote.mtime) : null;
+
+  if (local.size !== remote.size) {
+    return false;
+  }
+
+  if (localTime === null || remoteTime === null) {
+    return false;
+  }
+
+  return Math.abs(localTime - remoteTime) <= SYNC_TOLERANCE_MS;
+};
+
+const signaturesMatch = (previousSignature, currentSignature) => (
+  previousSignature === currentSignature || signaturesCloseEnough(previousSignature, currentSignature)
+);
+
+const createEmptySummary = () => ({
+  uploadedNew: 0,
+  uploadedUpdated: 0,
+  downloadedNew: 0,
+  downloadedUpdated: 0,
+  deletedRemote: 0,
+  deletedLocal: 0,
+  conflicts: [],
+});
+
+const createSummaryMessage = (summary) => {
+  const parts = [];
+
+  if (summary.uploadedNew) parts.push(`${summary.uploadedNew} uploaded`);
+  if (summary.uploadedUpdated) parts.push(`${summary.uploadedUpdated} revised`);
+  if (summary.downloadedNew) parts.push(`${summary.downloadedNew} downloaded`);
+  if (summary.downloadedUpdated) parts.push(`${summary.downloadedUpdated} revised`);
+  if (summary.deletedRemote) parts.push(`${summary.deletedRemote} deleted`);
+  if (summary.conflicts.length) parts.push(`${summary.conflicts.length} conflicts`);
+
+  return parts.length > 0 ? parts.join(' · ') : 'No changes';
+};
+
+const createConflictCopyPath = (filePath) => {
+  const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+$/, '').replace('T', '-');
+  const extensionIndex = filePath.lastIndexOf('.');
+  if (extensionIndex === -1) {
+    return `${filePath}.remote-conflict-${timestamp}`;
+  }
+
+  return `${filePath.slice(0, extensionIndex)}.remote-conflict-${timestamp}${filePath.slice(extensionIndex)}`;
+};
+
+const toSnapshotEntry = (localFile, remoteFile) => ({
+  localSignature: localFile?.signature ?? null,
+  remoteSignature: remoteFile?.signature ?? null,
+});
+
+export function useWebDAVSync(currentFolder) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
+  const [lastSyncSummary, setLastSyncSummary] = useState('');
+  const [lastSyncAt, setLastSyncAt] = useState(null);
   const cancelRef = useRef(false);
+  const autoSyncKeyRef = useRef(null);
+  const { syncMode, autoSyncOnLaunch } = useSettings();
 
   const readDirRecursive = async (dirPath, baseDir) => {
     const results = [];
     const entries = await readDir(dirPath);
 
     for (const entry of entries) {
-      // 跳过隐藏文件和文件夹（以.开头）
       if (entry.name.startsWith('.')) {
         continue;
       }
@@ -23,11 +170,15 @@ export function useWebDAVSync() {
       if (entry.isDirectory) {
         const subResults = await readDirRecursive(fullPath, baseDir);
         results.push(...subResults);
-      } else if (entry.isFile && /\.(md|markdown|txt)$/i.test(entry.name)) {
+      } else if (entry.isFile && isTextSyncFile(entry.name)) {
+        const fileStat = await stat(fullPath);
         results.push({
           name: entry.name,
           path: fullPath,
-          relativePath: relativePath
+          relativePath,
+          signature: createLocalSignature(fileStat),
+          mtimeMs: fileStat.mtime ? new Date(fileStat.mtime).getTime() : 0,
+          size: fileStat.size,
         });
       }
     }
@@ -35,15 +186,73 @@ export function useWebDAVSync() {
     return results;
   };
 
+  const listRemoteFilesRecursive = useCallback(async (remoteFolder) => {
+    const files = [];
+    const queue = [normalizeRemoteFolderBase(remoteFolder) || '/'];
+    const visited = new Set();
+    const rootPath = normalizeRemoteFolderBase(remoteFolder) || '/';
+
+    while (queue.length > 0) {
+      const batch = queue.splice(0, Math.min(queue.length, 5));
+      const batchResults = await Promise.all(
+        batch.map(async (currentPath) => {
+          if (!currentPath || visited.has(currentPath)) return null;
+          visited.add(currentPath);
+          return { path: currentPath, entries: await listFiles(currentPath) };
+        })
+      );
+
+      for (const result of batchResults) {
+        if (!result) continue;
+        const { entries } = result;
+
+        for (const entry of entries) {
+          const decodedPath = safeDecodeRemotePath(entry.path);
+          const normalizedPath = decodedPath.replace(/\/+$/, '') || '/';
+
+          if (normalizedPath === result.path.replace(/\/+$/, '') || normalizedPath === rootPath.replace(/\/+$/, '')) {
+            continue;
+          }
+
+          if (entry.is_directory) {
+            queue.push(normalizedPath);
+            continue;
+          }
+
+          if (!isTextSyncFile(entry.name || normalizedPath)) {
+            continue;
+          }
+
+          const relativePath = rootPath === '/'
+            ? normalizedPath.replace(/^\//, '')
+            : normalizedPath.replace(new RegExp(`^${rootPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/?`), '');
+
+          files.push({
+            name: entry.name,
+            path: normalizedPath,
+            relativePath,
+            signature: createRemoteSignature(entry),
+            mtimeMs: entry.last_modified ? Date.parse(entry.last_modified) : 0,
+            size: entry.size ?? 0,
+          });
+        }
+      }
+    }
+
+    return files;
+  }, []);
+
   const startSync = useCallback(async () => {
     if (!hasWebDAVClient()) {
       console.warn('[Sync] WebDAV未配置');
+      setLastSyncSummary('WebDAV not configured');
       return;
     }
 
     let currentFolder = localStorage.getItem('currentFolder');
     if (!currentFolder) {
       console.warn('[Sync] 请先打开一个文件夹');
+      setLastSyncSummary('Open a folder first');
       return;
     }
 
@@ -57,97 +266,288 @@ export function useWebDAVSync() {
       const pathExists = await exists(currentFolder);
       if (!pathExists) {
         console.error('[Sync] 路径不存在');
+        setLastSyncSummary('Local folder missing');
         return;
       }
 
       const config = readSavedWebDAVConfig();
       if (!config) {
         console.warn('[Sync] WebDAV配置无效');
+        setLastSyncSummary('Invalid WebDAV config');
         return;
       }
 
-      const remoteFolder = (config.folder || '/').replace(/\/$/, '');
+      const remoteFolder = normalizeRemoteFolderBase(config.folder) || '/';
+      const snapshotKey = buildSnapshotKey({
+        currentFolder,
+        remoteFolder,
+        url: config.url,
+        username: config.username,
+      });
 
-      const files = await readDirRecursive(currentFolder, currentFolder);
-      console.log('[Sync] Total files found:', files.length);
-      console.log('[Sync] First 3 files:', JSON.stringify(files.slice(0, 3), null, 2));
+      const allSnapshots = readAllSyncSnapshots();
+      const previousSnapshot = allSnapshots[snapshotKey] || {};
+      const nextSnapshot = {};
+      const summary = createEmptySummary();
 
-      if (files.length === 0) {
-        console.warn('[Sync] 无可同步文件');
-        setIsSyncing(false);
-        return;
+      const localFiles = await readDirRecursive(currentFolder, currentFolder);
+      const remoteFiles = await listRemoteFilesRecursive(remoteFolder);
+
+      // If remote is empty and we have a previous snapshot, reset local state
+      if (remoteFiles.length === 0 && Object.keys(previousSnapshot).length > 0) {
+        console.log('[Sync] Remote is empty, resetting local snapshot');
+        allSnapshots[snapshotKey] = {};
+        writeAllSyncSnapshots(allSnapshots);
       }
 
-      // 获取远程文件列表用于增量同步
-      let remoteFiles = {};
-      try {
-        const remoteList = await listFiles(remoteFolder);
-        remoteFiles = Object.fromEntries(remoteList.map(f => [f.name, f]));
-      } catch (e) {
-        console.warn('[Sync] 无法获取远程文件列表，将上传所有文件');
-      }
+      const localByRelativePath = Object.fromEntries(localFiles.map((file) => [file.relativePath, file]));
+      const remoteByRelativePath = Object.fromEntries(remoteFiles.map((file) => [file.relativePath, file]));
+      const trackedPaths = new Set([
+        ...Object.keys(previousSnapshot),
+        ...Object.keys(localByRelativePath),
+        ...Object.keys(remoteByRelativePath),
+      ]);
 
-      // 收集需要创建的目录
-      const dirsToCreate = new Set();
-      for (const file of files) {
-        const dirPath = file.relativePath.split('/').slice(0, -1).join('/');
-        if (dirPath) {
-          let currentPath = '';
-          for (const dir of dirPath.split('/')) {
-            currentPath = currentPath ? `${currentPath}/${dir}` : dir;
-            dirsToCreate.add(`${remoteFolder}/${currentPath}`);
+      const operations = [];
+
+      for (const relativePath of trackedPaths) {
+        const localFile = localByRelativePath[relativePath] || null;
+        const remoteFile = remoteByRelativePath[relativePath] || null;
+        const previousEntry = previousSnapshot[relativePath] || null;
+        const localChanged = localFile ? !previousEntry || !signaturesMatch(previousEntry.localSignature, localFile.signature) : false;
+        const remoteChanged = remoteFile ? !previousEntry || !signaturesMatch(previousEntry.remoteSignature, remoteFile.signature) : false;
+
+        if (localFile && remoteFile) {
+          if (!previousEntry) {
+            if (signaturesCloseEnough(localFile.signature, remoteFile.signature)) {
+              nextSnapshot[relativePath] = toSnapshotEntry(localFile, remoteFile);
+              summary.skipped += 1;
+              continue;
+            }
+
+            if (localFile.mtimeMs > remoteFile.mtimeMs + SYNC_TOLERANCE_MS) {
+              operations.push({ type: 'upload', relativePath, localFile, remoteFile, isNew: true });
+            } else if (remoteFile.mtimeMs > localFile.mtimeMs + SYNC_TOLERANCE_MS) {
+              operations.push({ type: 'download', relativePath, localFile, remoteFile, isNew: true });
+            } else {
+              operations.push({ type: 'conflict', relativePath, localFile, remoteFile });
+            }
+            continue;
+          }
+
+          if (localChanged && remoteChanged) {
+            if (signaturesCloseEnough(localFile.signature, remoteFile.signature)) {
+              nextSnapshot[relativePath] = toSnapshotEntry(localFile, remoteFile);
+              summary.skipped += 1;
+            } else {
+              operations.push({ type: 'conflict', relativePath, localFile, remoteFile });
+            }
+          } else if (localChanged) {
+            operations.push({ type: 'upload', relativePath, localFile, remoteFile, isNew: false });
+          } else if (remoteChanged) {
+            operations.push({ type: 'download', relativePath, localFile, remoteFile, isNew: false });
+          } else {
+            nextSnapshot[relativePath] = toSnapshotEntry(localFile, remoteFile);
+            summary.skipped += 1;
+          }
+          continue;
+        }
+
+        if (localFile && !remoteFile) {
+          if (!previousEntry || !previousEntry.remoteSignature) {
+            operations.push({ type: 'upload', relativePath, localFile, remoteFile: null, isNew: true });
+          } else if (localChanged) {
+            operations.push({ type: 'upload', relativePath, localFile, remoteFile: null, isNew: false });
+          } else if (syncMode === 'upload-only') {
+            operations.push({ type: 'deleteRemote', relativePath, remoteFile: { path: joinRemotePath(remoteFolder, relativePath) } });
+          }
+          continue;
+        }
+
+        if (!localFile && remoteFile) {
+          if (syncMode === 'upload-only') {
+            nextSnapshot[relativePath] = {
+              localSignature: null,
+              remoteSignature: remoteFile.signature,
+            };
+            summary.skipped += 1;
+          } else if (!previousEntry || !previousEntry.localSignature) {
+            operations.push({ type: 'download', relativePath, localFile: null, remoteFile });
+          } else if (remoteChanged) {
+            operations.push({ type: 'download', relativePath, localFile: null, remoteFile });
+          } else {
+            operations.push({ type: 'deleteRemote', relativePath, remoteFile });
           }
         }
       }
 
-      // 创建目录
-      for (const dir of dirsToCreate) {
-        try {
-          await createDirectory(dir);
-        } catch (e) {
-          // 目录可能已存在
+      const dirsToCreate = new Set();
+      for (const file of localFiles) {
+        const dirPath = file.relativePath.split('/').slice(0, -1).join('/');
+        if (!dirPath) {
+          continue;
+        }
+
+        let currentPath = '';
+        for (const dir of dirPath.split('/')) {
+          currentPath = currentPath ? `${currentPath}/${dir}` : dir;
+          dirsToCreate.add(joinRemotePath(remoteFolder, currentPath));
         }
       }
 
-      let uploadCount = 0;
-      for (let i = 0; i < files.length; i++) {
+      for (const dir of dirsToCreate) {
+        try {
+          await createDirectory(dir);
+        } catch {
+          // Directory may already exist remotely.
+        }
+      }
+
+      if (operations.length === 0) {
+        allSnapshots[snapshotKey] = nextSnapshot;
+        writeAllSyncSnapshots(allSnapshots);
+        setSyncProgress(100);
+        setLastSyncSummary('No changes');
+        console.log('[Sync] No changes detected');
+        return;
+      }
+
+      console.log('[Sync] Operations:', operations.map(op => `${op.type}: ${op.relativePath}`).join(', '));
+
+      const BATCH_SIZE = 10;
+      for (let i = 0; i < operations.length; i += BATCH_SIZE) {
         if (cancelRef.current) {
           console.log('[Sync] 已取消同步');
           break;
         }
 
-        const file = files[i];
-        const remotePath = `${remoteFolder}/${file.relativePath}`;
+        const batch = operations.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map(async (operation) => {
+          const remotePath = joinRemotePath(remoteFolder, operation.relativePath);
+          const localPath = `${currentFolder}/${operation.relativePath}`;
 
-        try {
-          const content = await readTextFile(file.path);
-          await uploadFile(file.path, remotePath, content);
-          uploadCount++;
-          setSyncProgress(Math.round(((i + 1) / files.length) * 100));
-        } catch (error) {
-          console.error(`[Sync] 上传失败: ${file.name}`, error);
-          // 继续上传其他文件
-        }
+          try {
+            if (operation.type === 'upload') {
+              const content = await readTextFile(operation.localFile.path);
+              await uploadFile(operation.localFile.path, remotePath, content);
+              if (operation.isNew) {
+                summary.uploadedNew += 1;
+              } else {
+                summary.uploadedUpdated += 1;
+              }
+              nextSnapshot[operation.relativePath] = toSnapshotEntry(operation.localFile, {
+                ...operation.remoteFile,
+                path: remotePath,
+                signature: operation.localFile.signature,
+              });
+            } else if (operation.type === 'download') {
+              const content = await downloadFile(remotePath);
+              await ensureLocalParentDir(localPath);
+              await writeTextFile(localPath, content);
+              const localStat = await stat(localPath);
+              const downloadedLocal = {
+                path: localPath,
+                relativePath: operation.relativePath,
+                signature: createLocalSignature(localStat),
+              };
+              if (operation.isNew) {
+                summary.downloadedNew += 1;
+              } else {
+                summary.downloadedUpdated += 1;
+              }
+              nextSnapshot[operation.relativePath] = {
+                localSignature: downloadedLocal.signature,
+                remoteSignature: operation.remoteFile.signature,
+              };
+            } else if (operation.type === 'deleteRemote') {
+              await deleteFile(remotePath);
+              summary.deletedRemote += 1;
+            } else if (operation.type === 'deleteLocal') {
+              await remove(localPath);
+              summary.deletedLocal += 1;
+            } else if (operation.type === 'conflict') {
+              const remoteContent = await downloadFile(remotePath);
+              const conflictPath = createConflictCopyPath(localPath);
+              await ensureLocalParentDir(conflictPath);
+              await writeTextFile(conflictPath, remoteContent);
+              summary.conflicts.push({ relativePath: operation.relativePath, conflictPath });
+              nextSnapshot[operation.relativePath] = toSnapshotEntry(operation.localFile, operation.remoteFile);
+            }
+          } catch (error) {
+            console.error(`[Sync] Operation failed for ${operation.relativePath}:`, error);
+          }
+        }));
+
+        setSyncProgress(Math.round(((i + batch.length) / operations.length) * 100));
+        setLastSyncSummary(createSummaryMessage(summary));
       }
 
-      if (cancelRef.current) {
-        console.log(`[Sync] 已取消，已上传 ${uploadCount}/${files.length} 个文件`);
-      } else {
-        console.log(`[Sync] 完成！上传 ${uploadCount} 个文件`);
+      if (!cancelRef.current) {
+        allSnapshots[snapshotKey] = nextSnapshot;
+        writeAllSyncSnapshots(allSnapshots);
+      }
+
+      const message = createSummaryMessage(summary);
+      setLastSyncSummary(message);
+      setLastSyncAt(Date.now());
+      console.log('[Sync] Summary:', message);
+
+      if (summary.conflicts.length > 0) {
+        const conflictLines = summary.conflicts
+          .slice(0, 5)
+          .map((item) => `${item.relativePath} -> ${item.conflictPath.split('/').pop()}`)
+          .join('\n');
+
+        window.alert(
+          `WebDAV sync finished with ${summary.conflicts.length} conflict(s).\n\nRemote copies were saved next to your local files:\n${conflictLines}`
+        );
       }
     } catch (error) {
       console.error('[Sync] Failed:', error);
+      setLastSyncSummary(error instanceof Error ? error.message : 'Sync failed');
+      setLastSyncAt(Date.now());
     } finally {
       setTimeout(() => {
         setIsSyncing(false);
         setSyncProgress(0);
       }, 500);
     }
-  }, []);
+  }, [listRemoteFilesRecursive, syncMode]);
+
+  useEffect(() => {
+    if (!autoSyncOnLaunch || !currentFolder || isSyncing || !hasWebDAVClient()) {
+      return;
+    }
+
+    const config = readSavedWebDAVConfig();
+    if (!config) {
+      return;
+    }
+
+    const autoKey = buildSnapshotKey({
+      currentFolder,
+      remoteFolder: normalizeRemoteFolderBase(config.folder) || '/',
+      url: config.url,
+      username: config.username,
+    });
+
+    if (autoSyncKeyRef.current === autoKey) {
+      return;
+    }
+
+    autoSyncKeyRef.current = autoKey;
+    void startSync();
+  }, [autoSyncOnLaunch, currentFolder, isSyncing, startSync]);
 
   const cancelSync = useCallback(() => {
     cancelRef.current = true;
   }, []);
 
-  return { isSyncing, syncProgress, startSync, cancelSync };
+  useEffect(() => {
+    return () => {
+      cancelRef.current = true;
+    };
+  }, []);
+
+  return { isSyncing, syncProgress, startSync, cancelSync, lastSyncSummary, lastSyncAt, syncMode };
 }

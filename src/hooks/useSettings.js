@@ -11,17 +11,23 @@ export function useSettings() {
     const [fileSortBy, setFileSortBy] = useState(() => loadSavedState('fileSortBy', 'name'));
     const [showHiddenFiles, setShowHiddenFiles] = useState(() => loadSavedState('showHiddenFiles', false));
     const [hiddenFilesWhitelist, setHiddenFilesWhitelist] = useState(() => loadSavedState('hiddenFilesWhitelist', []));
+    const [syncMode, setSyncMode] = useState(() => loadSavedState('syncMode', 'upload-only'));
+    const [autoSyncOnLaunch, setAutoSyncOnLaunch] = useState(() => loadSavedState('autoSyncOnLaunch', false));
 
     useEffect(() => { saveState('attachmentFolder', attachmentFolder); }, [attachmentFolder]);
     useEffect(() => { saveState('autoSaveEnabled', autoSaveEnabled); }, [autoSaveEnabled]);
     useEffect(() => { saveState('fileSortBy', fileSortBy); }, [fileSortBy]);
     useEffect(() => { saveState('showHiddenFiles', showHiddenFiles); }, [showHiddenFiles]);
     useEffect(() => { saveState('hiddenFilesWhitelist', hiddenFilesWhitelist); }, [hiddenFilesWhitelist]);
+    useEffect(() => { saveState('syncMode', syncMode); }, [syncMode]);
+    useEffect(() => { saveState('autoSyncOnLaunch', autoSyncOnLaunch); }, [autoSyncOnLaunch]);
     useEffect(() => subscribeToStoredState('attachmentFolder', setAttachmentFolder), []);
     useEffect(() => subscribeToStoredState('autoSaveEnabled', setAutoSaveEnabled), []);
     useEffect(() => subscribeToStoredState('fileSortBy', setFileSortBy), []);
     useEffect(() => subscribeToStoredState('showHiddenFiles', setShowHiddenFiles), []);
     useEffect(() => subscribeToStoredState('hiddenFilesWhitelist', setHiddenFilesWhitelist), []);
+    useEffect(() => subscribeToStoredState('syncMode', setSyncMode), []);
+    useEffect(() => subscribeToStoredState('autoSyncOnLaunch', setAutoSyncOnLaunch), []);
 
     return {
         attachmentFolder, setAttachmentFolder,
@@ -29,5 +35,7 @@ export function useSettings() {
         fileSortBy, setFileSortBy,
         showHiddenFiles, setShowHiddenFiles,
         hiddenFilesWhitelist, setHiddenFilesWhitelist,
+        syncMode, setSyncMode,
+        autoSyncOnLaunch, setAutoSyncOnLaunch,
     };
 }

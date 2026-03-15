@@ -3,7 +3,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useTheme } from '../hooks/useTheme';
 import { useSettings } from '../hooks/useSettings';
 import { BACKGROUND_COLORS, FONT_FAMILIES, FONT_OPTIONS } from '../constants/theme';
-import { initWebDAV, readSavedWebDAVConfig, saveWebDAVConfig, testConnection } from '../utils/webdav';
+import { prepareWebDAVConfig, readSavedWebDAVConfig, saveWebDAVConfig, testConnection } from '../utils/webdav';
 
 const PREFERENCE_SECTIONS = [
   {
@@ -87,7 +87,11 @@ export default function PreferencesWindow() {
     showHiddenFiles,
     setShowHiddenFiles,
     hiddenFilesWhitelist,
-    setHiddenFilesWhitelist
+    setHiddenFilesWhitelist,
+    syncMode,
+    setSyncMode,
+    autoSyncOnLaunch,
+    setAutoSyncOnLaunch
   } = useSettings();
 
   const [webdavUrl, setWebdavUrl] = useState('');
@@ -112,7 +116,7 @@ export default function PreferencesWindow() {
   const handleWebDAVConnect = async () => {
     setWebdavStatus('Connecting...');
 
-    const result = initWebDAV(webdavUrl, webdavUsername, webdavPassword, webdavFolder);
+    const result = prepareWebDAVConfig(webdavUrl, webdavUsername, webdavPassword, webdavFolder);
     if (!result.success) {
       setWebdavConnected(false);
       setWebdavStatus('❌ Failed: ' + result.error);
@@ -403,6 +407,25 @@ export default function PreferencesWindow() {
                       placeholder="/Documents"
                     />
                   )}
+                />
+                <PreferenceRow
+                  label="Sync Mode"
+                  hint="Choose whether sync only uploads local changes or also brings remote changes back."
+                  control={(
+                    <select
+                      value={syncMode}
+                      onChange={(event) => setSyncMode(event.target.value)}
+                      className="w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
+                    >
+                      <option value="two-way">Two-Way Sync</option>
+                      <option value="upload-only">Upload Only</option>
+                    </select>
+                  )}
+                />
+                <PreferenceRow
+                  label="Auto Sync On Launch"
+                  hint="Start a sync automatically when a workspace is already open."
+                  control={<Toggle checked={autoSyncOnLaunch} onChange={setAutoSyncOnLaunch} />}
                 />
                 <PreferenceRow
                   label="Connection"
