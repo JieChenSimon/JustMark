@@ -2,6 +2,9 @@ mod save_image_command;
 mod web_clipper_command;
 mod webdav_command;
 
+#[cfg(target_os = "macos")]
+mod native_toolbar;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -17,7 +20,9 @@ pub fn run() {
             webdav_command::webdav_upload_file,
             webdav_command::webdav_download_file,
             webdav_command::webdav_create_directory,
-            webdav_command::webdav_delete_file
+            webdav_command::webdav_delete_file,
+            #[cfg(target_os = "macos")]
+            native_toolbar::setup_native_toolbar
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

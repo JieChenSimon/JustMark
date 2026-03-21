@@ -1,6 +1,7 @@
 /* @refresh reset */
 import { useState, useRef, useDeferredValue, useCallback, useMemo, useEffect } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { invoke } from '@tauri-apps/api/core';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { useTheme } from './hooks/useTheme';
@@ -575,6 +576,11 @@ function App() {
     minimizeWindow: () => void appWindow.minimize(),
     maximizeWindow: () => void appWindow.toggleMaximize(),
   }, recentFiles);
+
+  useEffect(() => {
+    invoke('setup_native_toolbar');
+    invoke('setup_native_splitview');
+  }, []);
 
   return (
     <div

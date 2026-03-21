@@ -47,6 +47,7 @@
   .jm-shell {
     @apply flex h-full flex-col overflow-hidden;
     background: var(--jm-window-bg);
+    padding-top: 28px; /* macOS native title bar height */
   }
 
   .jm-toolbar {
