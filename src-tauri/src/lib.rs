@@ -15,6 +15,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             save_image_command::save_image_from_clipboard,
             web_clipper_command::fetch_url_content,
+            webdav_command::webdav_save_password,
+            webdav_command::webdav_get_password,
+            webdav_command::webdav_delete_password,
             webdav_command::webdav_test_connection,
             webdav_command::webdav_list_files,
             webdav_command::webdav_upload_file,

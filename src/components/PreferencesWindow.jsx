@@ -3,7 +3,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useTheme } from '../hooks/useTheme';
 import { useSettings } from '../hooks/useSettings';
 import { BACKGROUND_COLORS, FONT_FAMILIES, FONT_OPTIONS } from '../constants/theme';
-import { prepareWebDAVConfig, readSavedWebDAVConfig, saveWebDAVConfig, testConnection } from '../utils/webdav';
+import { ensureWebDAVConfigLoaded, prepareWebDAVConfig, saveWebDAVConfig, testConnection } from '../utils/webdav';
 
 const PREFERENCE_SECTIONS = [
   {
@@ -99,26 +99,42 @@ export default function PreferencesWindow() {
   const [webdavPassword, setWebdavPassword] = useState('');
   const [webdavFolder, setWebdavFolder] = useState('/');
   const [webdavStatus, setWebdavStatus] = useState('');
-  const [webdavConnected, setWebdavConnected] = useState(false);
+  const [webdavConfigured, setWebdavConfigured] = useState(false);
   const [newWhitelistItem, setNewWhitelistItem] = useState('');
 
   useEffect(() => {
-    const savedConfig = readSavedWebDAVConfig();
-    if (savedConfig) {
+    let cancelled = false;
+
+    void ensureWebDAVConfigLoaded().then((savedConfig) => {
+      if (!savedConfig || cancelled) {
+        return;
+      }
+
       setWebdavUrl(savedConfig.url || '');
       setWebdavUsername(savedConfig.username || '');
-      setWebdavPassword(savedConfig.password || '');
       setWebdavFolder(savedConfig.folder || '/');
-      setWebdavConnected(savedConfig.connected || false);
-    }
+      setWebdavConfigured(Boolean(savedConfig.url && savedConfig.username && (savedConfig.passwordSaved || savedConfig.password)));
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleWebDAVConnect = async () => {
     setWebdavStatus('Connecting...');
 
-    const result = prepareWebDAVConfig(webdavUrl, webdavUsername, webdavPassword, webdavFolder);
+    const savedConfig = await ensureWebDAVConfigLoaded();
+    const canReuseSavedPassword = !webdavPassword
+      && savedConfig
+      && savedConfig.url === webdavUrl.trim()
+      && savedConfig.username === webdavUsername.trim()
+      && savedConfig.folder === (webdavFolder.trim() || '/');
+    const effectivePassword = webdavPassword || (canReuseSavedPassword ? savedConfig.password : '');
+
+    const result = prepareWebDAVConfig(webdavUrl, webdavUsername, effectivePassword, webdavFolder);
     if (!result.success) {
-      setWebdavConnected(false);
+      setWebdavConfigured(false);
       setWebdavStatus('❌ Failed: ' + result.error);
       return;
     }
@@ -126,13 +142,14 @@ export default function PreferencesWindow() {
     try {
       await testConnection(result.config);
 
-      const config = saveWebDAVConfig({ ...result.config, connected: true });
-      setWebdavConnected(true);
-      setWebdavStatus('✅ Connected');
+      await saveWebDAVConfig(result.config);
+      setWebdavConfigured(true);
+      setWebdavPassword('');
+      setWebdavStatus('✅ Configuration saved');
       setTimeout(() => setWebdavStatus(''), 3000);
     } catch (error) {
       console.error('[Connect] Test failed:', error);
-      setWebdavConnected(false);
+      setWebdavConfigured(false);
       setWebdavStatus(`❌ Failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
@@ -349,9 +366,9 @@ export default function PreferencesWindow() {
                 description={PREFERENCE_SECTIONS[2].description}
                 statusIndicator={
                   <div className="flex items-center gap-1.5">
-                    <div className={`h-2 w-2 rounded-full ${webdavConnected ? 'bg-green-500' : 'bg-gray-300'}`} />
+                    <div className={`h-2 w-2 rounded-full ${webdavConfigured ? 'bg-green-500' : 'bg-gray-300'}`} />
                     <span className="text-[11px] text-slate-500">
-                      {webdavConnected ? 'Connected' : 'Not connected'}
+                      {webdavConfigured ? 'Config saved' : 'Not configured'}
                     </span>
                   </div>
                 }
@@ -363,7 +380,10 @@ export default function PreferencesWindow() {
                     <input
                       type="text"
                       value={webdavUrl}
-                      onChange={(e) => setWebdavUrl(e.target.value)}
+                      onChange={(e) => {
+                        setWebdavUrl(e.target.value);
+                        setWebdavConfigured(false);
+                      }}
                       className="w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-400 hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
                       placeholder="https://example.com/webdav"
                     />
@@ -376,7 +396,10 @@ export default function PreferencesWindow() {
                     <input
                       type="text"
                       value={webdavUsername}
-                      onChange={(e) => setWebdavUsername(e.target.value)}
+                      onChange={(e) => {
+                        setWebdavUsername(e.target.value);
+                        setWebdavConfigured(false);
+                      }}
                       className="w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-400 hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
                       placeholder="username"
                     />
@@ -389,7 +412,10 @@ export default function PreferencesWindow() {
                     <input
                       type="password"
                       value={webdavPassword}
-                      onChange={(e) => setWebdavPassword(e.target.value)}
+                      onChange={(e) => {
+                        setWebdavPassword(e.target.value);
+                        setWebdavConfigured(false);
+                      }}
                       className="w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-400 hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
                       placeholder="••••••••"
                     />
@@ -402,7 +428,10 @@ export default function PreferencesWindow() {
                     <input
                       type="text"
                       value={webdavFolder}
-                      onChange={(e) => setWebdavFolder(e.target.value)}
+                      onChange={(e) => {
+                        setWebdavFolder(e.target.value);
+                        setWebdavConfigured(false);
+                      }}
                       className="w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-400 hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
                       placeholder="/Documents"
                     />
@@ -410,7 +439,7 @@ export default function PreferencesWindow() {
                 />
                 <PreferenceRow
                   label="Sync Mode"
-                  hint="Choose whether sync only uploads local changes or also brings remote changes back."
+                  hint="Choose whether sync keeps a safe remote backup or allows two-way transfers."
                   control={(
                     <select
                       value={syncMode}
@@ -418,7 +447,7 @@ export default function PreferencesWindow() {
                       className="w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
                     >
                       <option value="two-way">Two-Way Sync</option>
-                      <option value="upload-only">Upload Only</option>
+                      <option value="backup">Backup (Upload Only)</option>
                     </select>
                   )}
                 />
@@ -436,7 +465,7 @@ export default function PreferencesWindow() {
                         onClick={handleWebDAVConnect}
                         className="rounded-md bg-[#007AFF] px-3 py-1.5 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-[#0051D5]"
                       >
-                        Connect
+                        Test & Save
                       </button>
                       {webdavStatus && <span className="text-[12px] text-slate-600">{webdavStatus}</span>}
                     </div>

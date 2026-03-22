@@ -1,14 +1,21 @@
 import { useState } from 'react';
-import { prepareWebDAVConfig, saveWebDAVConfig, testConnection } from '../utils/webdav';
+import { ensureWebDAVConfigLoaded, prepareWebDAVConfig, saveWebDAVConfig, testConnection } from '../utils/webdav';
 
 export default function WebDAVSettings({ initialConfig, onClose, onSave }) {
   const [url, setUrl] = useState(initialConfig?.url || '');
   const [username, setUsername] = useState(initialConfig?.username || '');
-  const [password, setPassword] = useState(initialConfig?.password || '');
+  const [password, setPassword] = useState('');
   const [status, setStatus] = useState('');
 
   const handleConnect = async () => {
-    const result = prepareWebDAVConfig(url, username, password);
+    const savedConfig = await ensureWebDAVConfigLoaded();
+    const canReuseSavedPassword = !password
+      && savedConfig
+      && savedConfig.url === url.trim()
+      && savedConfig.username === username.trim()
+      && savedConfig.password;
+    const effectivePassword = password || (canReuseSavedPassword ? savedConfig.password : '');
+    const result = prepareWebDAVConfig(url, username, effectivePassword);
     if (!result.success) {
       setStatus('❌ 连接失败: ' + result.error);
       return;
@@ -16,8 +23,9 @@ export default function WebDAVSettings({ initialConfig, onClose, onSave }) {
 
     try {
       await testConnection(result.config);
-      const config = saveWebDAVConfig({ ...result.config, connected: true });
-      setStatus('✅ 连接成功');
+      const config = await saveWebDAVConfig(result.config);
+      setPassword('');
+      setStatus('✅ 配置已保存');
       onSave?.(config);
       setTimeout(onClose, 1000);
     } catch (error) {

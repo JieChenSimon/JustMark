@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "clean:tauri-bundle": "node scripts/clean-tauri-bundle.mjs",
+    "test:webdav-phase0": "node --test tests/webdav-phase0.test.mjs",
     "preview": "vite preview",
     "tauri": "node scripts/sync-version.mjs && tauri"
   },

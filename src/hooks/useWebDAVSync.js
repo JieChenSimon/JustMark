@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { readDir, readTextFile, exists, stat, mkdir, remove, writeTextFile } from '@tauri-apps/plugin-fs';
-import { hasWebDAVClient, readSavedWebDAVConfig, uploadFile, listFiles, createDirectory, downloadFile, deleteFile } from '../utils/webdav';
+import { ensureWebDAVConfigLoaded, hasWebDAVClient, uploadFile, listFiles, createDirectory, downloadFile, deleteFile } from '../utils/webdav';
 import { useSettings } from './useSettings';
 
 const WEBDAV_SYNC_STATE_KEY = 'webdav_sync_state_v2';
@@ -115,6 +115,7 @@ const createEmptySummary = () => ({
   downloadedUpdated: 0,
   deletedRemote: 0,
   deletedLocal: 0,
+  skipped: 0,
   conflicts: [],
 });
 
@@ -154,6 +155,7 @@ export function useWebDAVSync(currentFolder) {
   const cancelRef = useRef(false);
   const autoSyncKeyRef = useRef(null);
   const { syncMode, autoSyncOnLaunch } = useSettings();
+  const isBackupMode = syncMode === 'backup' || syncMode === 'upload-only';
 
   const readDirRecursive = async (dirPath, baseDir) => {
     const results = [];
@@ -270,7 +272,7 @@ export function useWebDAVSync(currentFolder) {
         return;
       }
 
-      const config = readSavedWebDAVConfig();
+      const config = await ensureWebDAVConfigLoaded();
       if (!config) {
         console.warn('[Sync] WebDAV配置无效');
         setLastSyncSummary('Invalid WebDAV config');
@@ -354,18 +356,18 @@ export function useWebDAVSync(currentFolder) {
         }
 
         if (localFile && !remoteFile) {
-          if (!previousEntry || !previousEntry.remoteSignature) {
-            operations.push({ type: 'upload', relativePath, localFile, remoteFile: null, isNew: true });
-          } else if (localChanged) {
-            operations.push({ type: 'upload', relativePath, localFile, remoteFile: null, isNew: false });
-          } else if (syncMode === 'upload-only') {
-            operations.push({ type: 'deleteRemote', relativePath, remoteFile: { path: joinRemotePath(remoteFolder, relativePath) } });
-          }
+          operations.push({
+            type: 'upload',
+            relativePath,
+            localFile,
+            remoteFile: null,
+            isNew: !previousEntry || !previousEntry.remoteSignature,
+          });
           continue;
         }
 
         if (!localFile && remoteFile) {
-          if (syncMode === 'upload-only') {
+          if (isBackupMode) {
             nextSnapshot[relativePath] = {
               localSignature: null,
               remoteSignature: remoteFile.signature,
@@ -376,7 +378,12 @@ export function useWebDAVSync(currentFolder) {
           } else if (remoteChanged) {
             operations.push({ type: 'download', relativePath, localFile: null, remoteFile });
           } else {
-            operations.push({ type: 'deleteRemote', relativePath, remoteFile });
+            // Phase 0 safety stop: never infer a remote delete from a missing local file.
+            nextSnapshot[relativePath] = {
+              localSignature: null,
+              remoteSignature: remoteFile.signature,
+            };
+            summary.skipped += 1;
           }
         }
       }
@@ -512,31 +519,38 @@ export function useWebDAVSync(currentFolder) {
         setSyncProgress(0);
       }, 500);
     }
-  }, [listRemoteFilesRecursive, syncMode]);
+  }, [isBackupMode, listRemoteFilesRecursive]);
 
   useEffect(() => {
     if (!autoSyncOnLaunch || !currentFolder || isSyncing || !hasWebDAVClient()) {
       return;
     }
 
-    const config = readSavedWebDAVConfig();
-    if (!config) {
-      return;
-    }
+    let cancelled = false;
 
-    const autoKey = buildSnapshotKey({
-      currentFolder,
-      remoteFolder: normalizeRemoteFolderBase(config.folder) || '/',
-      url: config.url,
-      username: config.username,
+    void ensureWebDAVConfigLoaded().then((config) => {
+      if (!config || cancelled) {
+        return;
+      }
+
+      const autoKey = buildSnapshotKey({
+        currentFolder,
+        remoteFolder: normalizeRemoteFolderBase(config.folder) || '/',
+        url: config.url,
+        username: config.username,
+      });
+
+      if (autoSyncKeyRef.current === autoKey) {
+        return;
+      }
+
+      autoSyncKeyRef.current = autoKey;
+      void startSync();
     });
 
-    if (autoSyncKeyRef.current === autoKey) {
-      return;
-    }
-
-    autoSyncKeyRef.current = autoKey;
-    void startSync();
+    return () => {
+      cancelled = true;
+    };
   }, [autoSyncOnLaunch, currentFolder, isSyncing, startSync]);
 
   const cancelSync = useCallback(() => {
