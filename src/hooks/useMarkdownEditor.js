@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-export const useMarkdownEditor = ({ markdown, setMarkdown, markdownRef }) => {
+export const useMarkdownEditor = ({ markdown, setMarkdown, markdownRef, textareaRef }) => {
   const handleMarkdownChange = useCallback((e) => {
     const newValue = e.target.value;
     setMarkdown(newValue);
@@ -8,62 +8,63 @@ export const useMarkdownEditor = ({ markdown, setMarkdown, markdownRef }) => {
   }, [setMarkdown, markdownRef]);
 
   const handleFormatText = useCallback((format) => {
-    const textarea = document.querySelector('textarea');
+    const textarea = textareaRef?.current;
     if (!textarea) return;
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const selectedText = markdown.substring(start, end);
+    const selectedText = textarea.value.substring(start, end);
     let newText;
     let newCursorPos = start;
 
+    const currentValue = textarea.value;
     switch (format) {
       case 'bold':
-        newText = markdown.substring(0, start) + `**${selectedText}**` + markdown.substring(end);
+        newText = currentValue.substring(0, start) + `**${selectedText}**` + currentValue.substring(end);
         newCursorPos = start + 2;
         break;
       case 'italic':
-        newText = markdown.substring(0, start) + `*${selectedText}*` + markdown.substring(end);
+        newText = currentValue.substring(0, start) + `*${selectedText}*` + currentValue.substring(end);
         newCursorPos = start + 1;
         break;
       case 'strikethrough':
-        newText = markdown.substring(0, start) + `~~${selectedText}~~` + markdown.substring(end);
+        newText = currentValue.substring(0, start) + `~~${selectedText}~~` + currentValue.substring(end);
         newCursorPos = start + 2;
         break;
       case 'code':
-        newText = markdown.substring(0, start) + `\`${selectedText}\`` + markdown.substring(end);
+        newText = currentValue.substring(0, start) + `\`${selectedText}\`` + currentValue.substring(end);
         newCursorPos = start + 1;
         break;
       case 'link':
-        newText = markdown.substring(0, start) + `[${selectedText}](url)` + markdown.substring(end);
+        newText = currentValue.substring(0, start) + `[${selectedText}](url)` + currentValue.substring(end);
         newCursorPos = start + selectedText.length + 3;
         break;
       case 'h1':
-        newText = markdown.substring(0, start) + `# ${selectedText}` + markdown.substring(end);
+        newText = currentValue.substring(0, start) + `# ${selectedText}` + currentValue.substring(end);
         newCursorPos = start + 2;
         break;
       case 'h2':
-        newText = markdown.substring(0, start) + `## ${selectedText}` + markdown.substring(end);
+        newText = currentValue.substring(0, start) + `## ${selectedText}` + currentValue.substring(end);
         newCursorPos = start + 3;
         break;
       case 'h3':
-        newText = markdown.substring(0, start) + `### ${selectedText}` + markdown.substring(end);
+        newText = currentValue.substring(0, start) + `### ${selectedText}` + currentValue.substring(end);
         newCursorPos = start + 4;
         break;
       case 'quote':
-        newText = markdown.substring(0, start) + `> ${selectedText}` + markdown.substring(end);
+        newText = currentValue.substring(0, start) + `> ${selectedText}` + currentValue.substring(end);
         newCursorPos = start + 2;
         break;
       case 'ul':
-        newText = markdown.substring(0, start) + `- ${selectedText}` + markdown.substring(end);
+        newText = currentValue.substring(0, start) + `- ${selectedText}` + currentValue.substring(end);
         newCursorPos = start + 2;
         break;
       case 'ol':
-        newText = markdown.substring(0, start) + `1. ${selectedText}` + markdown.substring(end);
+        newText = currentValue.substring(0, start) + `1. ${selectedText}` + currentValue.substring(end);
         newCursorPos = start + 3;
         break;
       case 'task':
-        newText = markdown.substring(0, start) + `- [ ] ${selectedText}` + markdown.substring(end);
+        newText = currentValue.substring(0, start) + `- [ ] ${selectedText}` + currentValue.substring(end);
         newCursorPos = start + 6;
         break;
       default:
@@ -76,7 +77,7 @@ export const useMarkdownEditor = ({ markdown, setMarkdown, markdownRef }) => {
       textarea.focus();
       textarea.setSelectionRange(newCursorPos, newCursorPos);
     }, 0);
-  }, [markdown, setMarkdown, markdownRef]);
+  }, [setMarkdown, markdownRef]);
 
   const handleImagePasted = useCallback((imageMarkdown, textareaElement) => {
     if (!textareaElement) return;

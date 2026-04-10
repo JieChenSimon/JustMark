@@ -19,7 +19,7 @@ export const InlineCreateRow = memo(function InlineCreateRow({
             className="w-full px-1.5 py-0.5 text-left text-[11px] flex items-center gap-1 transition-all group"
         >
             <span className="shrink-0" style={{ width: `${indent + 8}px` }} />
-            <span className="flex-shrink-0 text-slate-400">
+            <span className="flex-shrink-0 text-black/30 dark:text-white/28">
                 {type === 'folder' ? <IconFolder className="h-[15px] w-[15px]" /> : <IconDocument className="h-[15px] w-[15px]" />}
             </span>
             <input
@@ -35,7 +35,7 @@ export const InlineCreateRow = memo(function InlineCreateRow({
                         onCancel();
                     }
                 }}
-                className="flex-1 bg-transparent border-b border-gray-300 dark:border-gray-600 text-[11px] text-gray-800 dark:text-gray-100 outline-none focus:border-blue-500 dark:focus:border-blue-400"
+                className="flex-1 border-b border-black/10 bg-transparent text-[11px] text-[color:var(--jm-text)] outline-none focus:border-[var(--jm-accent)] dark:border-white/10"
                 placeholder={type === 'folder' ? 'New folder' : 'New file'}
                 autoComplete="off"
                 autoFocus
@@ -79,7 +79,6 @@ export const FileTreeItem = memo(function FileTreeItem({
     invalidDropPath,
     dragOperation
 }) {
-    const TREE_DEBUG_PATTERN = /00- 雅思-口语|Hu et al\.|面签英语/;
     const resolveEntryPath = (item, parentPath) => item.path || `${parentPath}/${item.name}`;
     const getParentPath = (path) => path.slice(0, path.lastIndexOf('/'));
     const getPathDepth = (path, ancestorPath) => {
@@ -94,37 +93,33 @@ export const FileTreeItem = memo(function FileTreeItem({
     const [isRenaming, setIsRenaming] = useState(false);
     const [renameValue, setRenameValue] = useState(entry.name);
     const renameInputRef = useRef(null);
+    const contextMenuRef = useRef(null);
     const dragPreviewRef = useRef(null);
     const fullPath = resolveEntryPath(entry, basePath);
     const parentPath = getParentPath(fullPath);
     const isExpanded = expandedFolders.has(fullPath);
+    const prevExpandedRef = useRef(isExpanded);
     const isCurrentDocument = currentFilePath === fullPath;
     const isSelected = selectedSidebarPath === fullPath;
     const indent = getPathDepth(fullPath, rootPath) * 10;
     const isDragged = draggedPath === fullPath;
     const isDropTarget = dropTargetPath === fullPath;
     const isInvalidDropTarget = invalidDropPath === fullPath;
+    const contextMenuWidth = 168;
+    const contextMenuHeight = entry.isDirectory ? 180 : 134;
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : contextMenuWidth + 24;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : contextMenuHeight + 24;
+    const contextMenuLeft = Math.max(12, Math.min(contextMenu?.x ?? 0, viewportWidth - contextMenuWidth - 12));
+    const contextMenuTop = Math.max(12, Math.min(contextMenu?.y ?? 0, viewportHeight - contextMenuHeight - 12));
 
     useEffect(() => {
-        if (!import.meta.env.DEV || !TREE_DEBUG_PATTERN.test(fullPath)) {
-            return;
+        // 折叠时立即清空 children，避免 DOM 抖动
+        if (prevExpandedRef.current && !isExpanded) {
+            setChildren([]);
+            setIsLoading(false);
         }
+        prevExpandedRef.current = isExpanded;
 
-        console.log('[tree-node]', {
-            name: entry.name,
-            fullPath,
-            basePath,
-            parentPath,
-            rootPath,
-            level,
-            indent,
-            isDirectory: entry.isDirectory,
-            isExpanded,
-            childCount: children.length,
-        });
-    }, [basePath, children.length, entry.isDirectory, entry.name, fullPath, indent, isExpanded, level, parentPath, rootPath]);
-
-    useEffect(() => {
         const shouldLoad = entry.isDirectory && isExpanded;
 
         if (!shouldLoad) {
@@ -132,8 +127,7 @@ export const FileTreeItem = memo(function FileTreeItem({
         }
 
         let cancelled = false;
-        const shouldShowLoading = children.length === 0;
-        if (shouldShowLoading) {
+        if (children.length === 0) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsLoading(true);
         }
@@ -143,21 +137,11 @@ export const FileTreeItem = memo(function FileTreeItem({
                 if (!cancelled) {
                     setChildren(contents);
                     setIsLoading(false);
-
-                    if (import.meta.env.DEV && TREE_DEBUG_PATTERN.test(fullPath)) {
-                        console.groupCollapsed(`[tree-children] ${fullPath}`);
-                        console.table(contents.map((child) => ({
-                            name: child.name,
-                            path: child.path,
-                            isDirectory: child.isDirectory,
-                        })));
-                        console.groupEnd();
-                    }
                 }
             })
             .catch(() => {
                 if (!cancelled) {
-                    if (shouldShowLoading) {
+                    if (children.length === 0) {
                         setChildren([]);
                         setIsLoading(false);
                     }
@@ -167,7 +151,7 @@ export const FileTreeItem = memo(function FileTreeItem({
         return () => {
             cancelled = true;
         };
-    }, [children.length, entry.isDirectory, folderRefreshTimestamps, fullPath, getSubfolderContents, isExpanded]);
+    }, [entry.isDirectory, isExpanded, folderRefreshTimestamps, fullPath, getSubfolderContents]);
 
     const handleClick = () => {
         if (entry.isDirectory) {
@@ -239,12 +223,31 @@ export const FileTreeItem = memo(function FileTreeItem({
         onDropEntry?.(fullPath);
     };
 
-    // 点击其他地方关闭菜单
     useEffect(() => {
-        const handleClick = () => setContextMenu(null);
-        document.addEventListener('click', handleClick);
-        return () => document.removeEventListener('click', handleClick);
-    }, []);
+        if (!contextMenu) {
+            return undefined;
+        }
+
+        const handlePointerDown = (event) => {
+            if (contextMenuRef.current && !contextMenuRef.current.contains(event.target)) {
+                setContextMenu(null);
+            }
+        };
+
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                setContextMenu(null);
+            }
+        };
+
+        document.addEventListener('pointerdown', handlePointerDown, true);
+        document.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            document.removeEventListener('pointerdown', handlePointerDown, true);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [contextMenu]);
 
     return (
         <>
@@ -261,19 +264,19 @@ export const FileTreeItem = memo(function FileTreeItem({
                 onDragEnd={handleDragEnd}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
-                className={`select-none px-1.5 py-0.5 text-left text-[11px] flex items-center gap-1 transition-all group rounded-[7px] ${isDropTarget
-                    ? 'bg-[#dce9ff] dark:bg-blue-500/20 ring-1 ring-inset ring-[#9dbaf6] dark:ring-blue-400/40 shadow-[0_0_0_1px_rgba(59,130,246,0.06)]'
+                className={`select-none px-1.5 py-0.5 text-left text-[11px] flex items-center gap-1 transition-colors group rounded-[7px] ${isDropTarget
+                    ? 'bg-[color:var(--jm-sidebar-active)] ring-1 ring-inset ring-[color:var(--jm-sidebar-active-border)]'
                     : isInvalidDropTarget
                         ? 'bg-red-500/6 ring-1 ring-inset ring-red-500/35'
                         : isSelected
-                    ? 'bg-[#dce9ff] dark:bg-blue-500/20 text-[#173b87] dark:text-blue-200 ring-1 ring-inset ring-[#b7cdfa] dark:ring-blue-400/40'
-                    : 'hover:bg-white/80 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300'
+                    ? 'bg-[color:var(--jm-sidebar-active)] text-[color:var(--jm-accent)] ring-1 ring-inset ring-[color:var(--jm-sidebar-active-border)] dark:text-blue-200'
+                    : 'text-[color:var(--jm-text)]/88 hover:bg-[color:var(--jm-sidebar-hover)] dark:hover:bg-[color:var(--jm-sidebar-hover)]'
                     } ${isDragged ? 'opacity-45 scale-[0.985]' : ''}`}
             >
                 <span className="shrink-0" style={{ width: `${indent + 8}px` }} />
                 {entry.isDirectory && (
                     <svg
-                        className={`w-3 h-3 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''} ${isSelected ? 'text-[#315fca] dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'
+                        className={`w-3 h-3 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''} ${isSelected ? 'text-[color:var(--jm-accent)] dark:text-blue-300' : 'text-black/24 dark:text-white/26'
                             }`}
                         fill="currentColor"
                         viewBox="0 0 20 20"
@@ -282,7 +285,7 @@ export const FileTreeItem = memo(function FileTreeItem({
                     </svg>
                 )}
                 {!entry.isDirectory && <span className="w-3 h-3 shrink-0" />}
-                <span className={`flex-shrink-0 ${isSelected ? 'opacity-100 text-[#315fca] dark:text-blue-300' : 'opacity-70 text-slate-400 dark:text-slate-500'}`}>
+                <span className={`flex-shrink-0 ${isSelected ? 'opacity-100 text-[color:var(--jm-accent)] dark:text-blue-300' : 'opacity-60 text-black/24 dark:text-white/26'}`}>
                     {entry.isDirectory ? <IconFolder className="h-[15px] w-[15px]" /> : <IconDocument className="h-[15px] w-[15px]" />}
                 </span>
                 {isRenaming ? (
@@ -313,19 +316,19 @@ export const FileTreeItem = memo(function FileTreeItem({
                             }
                             setIsRenaming(false);
                         }}
-                                className="flex-1 bg-transparent border-b border-blue-400 text-[11px] text-slate-800 dark:text-gray-100 outline-none"
+                                className="flex-1 border-b border-[var(--jm-accent)] bg-transparent text-[11px] text-[color:var(--jm-text)] outline-none"
                         autoComplete="off"
                     />
                 ) : (
                     <>
-                        <span className={`truncate ${isSelected ? 'font-medium' : 'font-normal'}`}>
+                        <span className={`truncate ${isSelected ? 'font-medium' : 'font-normal'} ${isCurrentDocument && !isSelected ? 'text-[color:var(--jm-text)]/94' : ''}`}>
                             {entry.name}
                         </span>
                         {isCurrentDocument && !isSelected && (
-                            <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#5d80dc]" />
+                            <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--jm-accent)]" />
                         )}
                         {isDropTarget && (
-                            <span className="ml-auto rounded-lg border border-[#b7cdfa] bg-white/72 px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.08em] uppercase text-[#2d5bd1]">
+                            <span className="ml-auto rounded-lg border border-[color:var(--jm-accent)]/16 bg-white/72 px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.08em] uppercase text-[color:var(--jm-accent)] dark:bg-neutral-900/60">
                                 {dragOperation === 'copy' ? 'Copy Here' : 'Move Here'}
                             </span>
                         )}
@@ -348,11 +351,12 @@ export const FileTreeItem = memo(function FileTreeItem({
             {/* macOS 原生风格右键菜单 */}
             {contextMenu && contextMenu.path === fullPath && (
                 <div
-                    className="fixed z-50 rounded-md border border-black/[0.08] dark:border-white/[0.12] bg-[#fbfbfbf5] dark:bg-[#2b2b2bf5] shadow-[0_0_0_0.5px_rgba(0,0,0,0.04),0_3px_12px_rgba(0,0,0,0.15),0_10px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_0_0_0.5px_rgba(255,255,255,0.08),0_3px_12px_rgba(0,0,0,0.4),0_10px_32px_rgba(0,0,0,0.5)] backdrop-blur-[40px] animate-scale-in origin-top-left py-0.5"
+                    ref={contextMenuRef}
+                    className="jm-sidebar-context-menu fixed z-50 origin-top-left animate-scale-in"
                     style={{
-                        top: `${Math.min(contextMenu.y, window.innerHeight - 100)}px`,
-                        left: `${contextMenu.x}px`,
-                        width: '140px'
+                        top: `${contextMenuTop}px`,
+                        left: `${contextMenuLeft}px`,
+                        width: `${contextMenuWidth}px`
                     }}
                 >
                     {contextMenu.type === 'folder' && (
@@ -362,7 +366,7 @@ export const FileTreeItem = memo(function FileTreeItem({
                                     onStartInlineCreate(fullPath, 'file');
                                     setContextMenu(null);
                                 }}
-                                className="flex w-full items-center gap-1.5 px-2 py-0.5 text-left text-[11.5px] text-[#1d1d1f] dark:text-[#f5f5f7] transition-colors rounded-sm hover:bg-[#0066ff] hover:text-white"
+                                className="jm-sidebar-context-menu-item"
                             >
                                 <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -374,14 +378,14 @@ export const FileTreeItem = memo(function FileTreeItem({
                                     onStartInlineCreate(fullPath, 'folder');
                                     setContextMenu(null);
                                 }}
-                                className="flex w-full items-center gap-1.5 px-2 py-0.5 text-left text-[11.5px] text-[#1d1d1f] dark:text-[#f5f5f7] transition-colors rounded-sm hover:bg-[#0066ff] hover:text-white"
+                                className="jm-sidebar-context-menu-item"
                             >
                                 <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 7a2 2 0 012-2h3l2 2h9a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V7z" />
                                 </svg>
                                 <span>New Folder</span>
                             </button>
-                            <div className="h-px bg-black/[0.08] dark:bg-white/[0.08] my-0.5" />
+                            <div className="jm-sidebar-context-menu-separator" />
                         </>
                     )}
                     <button
@@ -401,7 +405,7 @@ export const FileTreeItem = memo(function FileTreeItem({
                                 }
                             }, 50);
                         }}
-                        className="flex w-full items-center gap-1.5 px-2 py-0.5 text-left text-[11.5px] text-[#1d1d1f] dark:text-[#f5f5f7] transition-colors rounded-sm hover:bg-[#0066ff] hover:text-white"
+                        className="jm-sidebar-context-menu-item"
                     >
                         <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -413,20 +417,20 @@ export const FileTreeItem = memo(function FileTreeItem({
                             onRevealInFinder(fullPath);
                             setContextMenu(null);
                         }}
-                        className="flex w-full items-center gap-1.5 px-2 py-0.5 text-left text-[11.5px] text-[#1d1d1f] dark:text-[#f5f5f7] transition-colors rounded-sm hover:bg-[#0066ff] hover:text-white"
+                        className="jm-sidebar-context-menu-item"
                     >
                         <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                         </svg>
                         <span>Reveal in Finder</span>
                     </button>
-                    <div className="h-px bg-black/[0.08] dark:bg-white/[0.08] my-0.5" />
+                    <div className="jm-sidebar-context-menu-separator" />
                     <button
                         onClick={(e) => {
                             onDeleteEntry(fullPath, e);
                             setContextMenu(null);
                         }}
-                        className="flex w-full items-center gap-1.5 px-2 py-0.5 text-left text-[11.5px] text-[#1d1d1f] dark:text-[#f5f5f7] transition-colors rounded-sm hover:bg-[#0066ff] hover:text-white"
+                        className="jm-sidebar-context-menu-item jm-sidebar-context-menu-item-danger"
                     >
                         <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3H4v2h16V7h-3z" />
@@ -436,10 +440,10 @@ export const FileTreeItem = memo(function FileTreeItem({
                 </div>
             )}
 
-            {entry.isDirectory && isExpanded && (
-                <div>
+            {entry.isDirectory && (
+                <div className={`jm-tree-children${isExpanded ? ' expanded' : ''}`}>
                     {isLoading ? (
-                        <div className="w-full px-1.5 py-0.5 text-[10px] text-slate-400">
+                        <div className="w-full px-1.5 py-0.5 text-[10px] text-black/30 dark:text-white/28">
                             <span className="inline-block" style={{ width: `${indent + 24}px` }} />
                             Loading…
                         </div>

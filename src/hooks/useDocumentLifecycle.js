@@ -1,4 +1,6 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+
+const AUTO_SAVE_DELAY_MS = 2000;
 
 export function useDocumentLifecycle({
   appWindow,
@@ -14,17 +16,119 @@ export function useDocumentLifecycle({
   restoreOnceRef,
   savedMarkdownRef,
 }) {
-  const isEditableTextPath = (path) => !path || /\.(md|markdown|txt)$/i.test(path);
+  const debounceTimerRef = useRef(null);
+  const saveInFlightRef = useRef(false);
+  const queuedSaveRef = useRef(false);
+  const flushAutoSaveRef = useRef(null);
+
+  const isEditableTextPath = useCallback((path) => !path || /\.(md|markdown|txt)$/i.test(path), []);
+
+  const clearDebounceTimer = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+  }, []);
+
+  const flushAutoSave = useCallback(async (reason = 'manual') => {
+    clearDebounceTimer();
+
+    if (!autoSaveEnabled || !hasUnsavedChanges || !currentFilePath || !isEditableTextPath(currentFilePath)) {
+      return false;
+    }
+
+    if (saveInFlightRef.current) {
+      queuedSaveRef.current = true;
+      return false;
+    }
+
+    saveInFlightRef.current = true;
+
+    try {
+      await fileOps.handleSave();
+      if (savedMarkdownRef) {
+        savedMarkdownRef.current = markdown;
+      }
+      return true;
+    } catch (error) {
+      console.error(`[useDocumentLifecycle] Auto-save failed (${reason}):`, error);
+      return false;
+    } finally {
+      saveInFlightRef.current = false;
+
+      if (queuedSaveRef.current) {
+        queuedSaveRef.current = false;
+        const nextFlush = flushAutoSaveRef.current;
+        if (nextFlush) {
+          void nextFlush('queued');
+        }
+      }
+    }
+  }, [
+    autoSaveEnabled,
+    clearDebounceTimer,
+    currentFilePath,
+    fileOps,
+    hasUnsavedChanges,
+    isEditableTextPath,
+    markdown,
+    savedMarkdownRef,
+  ]);
 
   useEffect(() => {
-    if (!autoSaveEnabled || !hasUnsavedChanges || !currentFilePath || !isEditableTextPath(currentFilePath)) return undefined;
+    flushAutoSaveRef.current = flushAutoSave;
+  }, [flushAutoSave]);
 
-    const timer = setTimeout(() => {
-      void fileOps.handleSave();
-    }, 2000);
+  useEffect(() => {
+    if (!autoSaveEnabled || !hasUnsavedChanges || !currentFilePath || !isEditableTextPath(currentFilePath)) {
+      clearDebounceTimer();
+      return undefined;
+    }
 
-    return () => clearTimeout(timer);
-  }, [autoSaveEnabled, currentFilePath, fileOps, hasUnsavedChanges, markdown]);
+    debounceTimerRef.current = setTimeout(() => {
+      void flushAutoSave('debounce');
+    }, AUTO_SAVE_DELAY_MS);
+
+    return clearDebounceTimer;
+  }, [
+    autoSaveEnabled,
+    clearDebounceTimer,
+    currentFilePath,
+    flushAutoSave,
+    hasUnsavedChanges,
+    isEditableTextPath,
+    markdown,
+  ]);
+
+  useEffect(() => {
+    if (!autoSaveEnabled || typeof document === 'undefined' || typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        void flushAutoSave('visibilitychange');
+      }
+    };
+
+    const handlePageHide = () => {
+      void flushAutoSave('pagehide');
+    };
+
+    const handleBeforeUnload = () => {
+      void flushAutoSave('beforeunload');
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [autoSaveEnabled, flushAutoSave]);
 
   useEffect(() => {
     if (restoreOnceRef.current) return;

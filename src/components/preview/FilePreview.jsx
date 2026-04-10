@@ -2,7 +2,17 @@ import { readFile } from '@tauri-apps/plugin-fs';
 import { useEffect, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+const PDF_WORKER_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
+
+(async () => {
+  try {
+    const res = await fetch('/pdf.worker.min.mjs');
+    if (!res.ok) throw new Error('not found');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+  } catch {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER_CDN;
+  }
+})();
 
 export default function FilePreview({ filePath }) {
   const [error, setError] = useState(null);
@@ -23,11 +33,8 @@ export default function FilePreview({ filePath }) {
         const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
         const renderedPages = [];
 
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-          if (cancelled) {
-            break;
-          }
-
+        const batchSize = 5;
+        const renderPage = async (pdf, pageNumber) => {
           const page = await pdf.getPage(pageNumber);
           const viewport = page.getViewport({ scale: 1.4 });
           const canvas = document.createElement('canvas');
@@ -40,17 +47,43 @@ export default function FilePreview({ filePath }) {
           renderTasks.push(renderTask);
           await renderTask.promise;
 
-          renderedPages.push({
+          return {
             pageNumber,
             dataUrl: canvas.toDataURL('image/png'),
             width: viewport.width,
             height: viewport.height,
-          });
-        }
+          };
+        };
 
-        if (!cancelled) {
-          setPages(renderedPages);
-        }
+        const scheduleBatch = async (startPage, renderedPages) => {
+          if (cancelled || startPage > pdf.numPages) {
+            if (!cancelled) {
+              setPages(renderedPages);
+            }
+            return;
+          }
+
+          const endPage = Math.min(startPage + batchSize - 1, pdf.numPages);
+          const batchPromises = [];
+          for (let i = startPage; i <= endPage; i += 1) {
+            batchPromises.push(renderPage(pdf, i));
+          }
+
+          const batchResults = await Promise.all(batchPromises);
+          renderedPages.push(...batchResults);
+
+          if (!cancelled) {
+            setPages([...renderedPages]);
+          }
+
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(() => scheduleBatch(endPage + 1, renderedPages));
+          } else {
+            setTimeout(() => scheduleBatch(endPage + 1, renderedPages), 0);
+          }
+        };
+
+        scheduleBatch(1, []);
       } catch (err) {
         if (!cancelled) {
           setError(err.message);

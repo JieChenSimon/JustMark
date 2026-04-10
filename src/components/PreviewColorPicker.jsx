@@ -18,25 +18,25 @@ export default function PreviewColorPicker({
         {/* Color Picker Button */}
         <button
           onClick={onToggleMenu}
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-200/50 dark:border-gray-600/50"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-black/8 bg-white/76 backdrop-blur-md shadow-[0_8px_24px_rgba(15,23,42,0.08)] transition-colors duration-200 hover:bg-white/90 dark:border-white/10 dark:bg-neutral-900/76 dark:hover:bg-neutral-800/88"
           title="Preview Background Color"
         >
           <div
-            className="w-4 h-4 rounded-full border-2 border-white dark:border-gray-600"
+            className="h-4 w-4 rounded-full border-2 border-white/90 dark:border-neutral-700"
             style={{ backgroundColor: previewBgColor }}
           ></div>
         </button>
 
         {/* Color Selection Menu */}
         {showMenu && (
-          <div className="absolute bottom-10 right-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200/50 dark:border-gray-600/50 p-3 min-w-[240px]">
+          <div className="absolute bottom-10 right-0 min-w-[240px] rounded-xl border border-black/8 bg-white/92 p-3 shadow-[0_18px_48px_rgba(15,23,42,0.12)] backdrop-blur-md dark:border-white/10 dark:bg-neutral-900/92">
             {/* Reset Option */}
             <button
               onClick={onReset}
-              className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 text-gray-700 dark:text-gray-300 mb-2 border-b border-gray-200 dark:border-gray-600"
+              className="mb-2 w-full rounded-lg border-b border-black/6 px-3 py-2 text-left text-sm text-gray-700 transition-colors duration-200 hover:bg-black/4 dark:border-white/8 dark:text-gray-300 dark:hover:bg-white/5"
             >
               <span className="font-medium">Follow Theme</span>
-              <span className="text-xs text-gray-500 dark:text-gray-400 block mt-0.5">
+              <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
                 Use current theme color
               </span>
             </button>
@@ -47,13 +47,13 @@ export default function PreviewColorPicker({
                 <button
                   key={index}
                   onClick={() => onColorSelect(index)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${previewBgColorIndex === index
-                      ? 'bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-500'
-                      : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-colors duration-200 ${previewBgColorIndex === index
+                      ? 'bg-blue-50/80 ring-1 ring-blue-400/50 dark:bg-blue-900/20 dark:ring-blue-400/35'
+                      : 'hover:bg-black/4 dark:hover:bg-white/5'
                     }`}
                 >
                   <div
-                    className="w-5 h-5 rounded-md border-2 border-gray-300 dark:border-gray-600 flex-shrink-0"
+                    className="h-5 w-5 flex-shrink-0 rounded-md border border-black/10 dark:border-white/10"
                     style={{ backgroundColor: color.bg }}
                   ></div>
                   <div className="flex-1 text-left">

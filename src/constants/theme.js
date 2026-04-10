@@ -65,11 +65,11 @@ export const FONT_FAMILIES = [
 
 // 字体大小选项
 export const FONT_OPTIONS = [
-  { label: 'Tiny', size: 'text-xs', leading: 'leading-5', name: 'Tiny', previewSize: '0.75rem' },
-  { label: 'Small', size: 'text-sm', leading: 'leading-6', name: 'Small', previewSize: '0.875rem' },
-  { label: 'Medium', size: 'text-base', leading: 'leading-7', name: 'Medium', previewSize: '1rem' },
-  { label: 'Large', size: 'text-lg', leading: 'leading-8', name: 'Large', previewSize: '1.125rem' },
-  { label: 'XLarge', size: 'text-xl', leading: 'leading-9', name: 'Extra Large', previewSize: '1.25rem' },
+  { label: '12 px', size: 'text-xs', leading: 'leading-5', name: '12 px', editorPx: 12, editorLineHeight: 1.7, previewPx: 12, previewSize: '0.75rem', codePreviewPx: 11, codePreviewSize: '0.6875rem' },
+  { label: '14 px', size: 'text-sm', leading: 'leading-6', name: '14 px', editorPx: 14, editorLineHeight: 1.75, previewPx: 14, previewSize: '0.875rem', codePreviewPx: 13, codePreviewSize: '0.8125rem' },
+  { label: '16 px', size: 'text-base', leading: 'leading-7', name: '16 px', editorPx: 16, editorLineHeight: 1.8, previewPx: 16, previewSize: '1rem', codePreviewPx: 14, codePreviewSize: '0.875rem' },
+  { label: '18 px', size: 'text-lg', leading: 'leading-8', name: '18 px', editorPx: 18, editorLineHeight: 1.85, previewPx: 18, previewSize: '1.125rem', codePreviewPx: 16, codePreviewSize: '1rem' },
+  { label: '20 px', size: 'text-xl', leading: 'leading-9', name: '20 px', editorPx: 20, editorLineHeight: 1.9, previewPx: 20, previewSize: '1.25rem', codePreviewPx: 18, codePreviewSize: '1.125rem' },
 ];
 
 // 阅读背景色配置

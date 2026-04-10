@@ -23,6 +23,7 @@ export const useFileOperations = ({
   currentFolder,
   setHasUnsavedChanges,
   addRecentFile,
+  addRecentFolder,
   setCurrentFolder,
   setFolderContents,
   setPreviewFilePath,
@@ -150,6 +151,7 @@ export const useFileOperations = ({
     }
 
     setCurrentFolder(folderPath);
+    addRecentFolder(folderPath);
     setFolderContents(sortEntries(filteredEntries));
     setExpandedFolders((prev) => {
       if (!preserveExpanded) {
@@ -175,7 +177,7 @@ export const useFileOperations = ({
 
       void scanTagsForEntries(filteredEntries, tagRequestId);
     }, 100);
-  }, [scanTagsForEntries, setCurrentFolder, setExpandedFolders, setFolderContents, sortEntries, showHiddenFiles, hiddenFilesWhitelist]);
+  }, [addRecentFolder, scanTagsForEntries, setCurrentFolder, setExpandedFolders, setFolderContents, sortEntries, showHiddenFiles, hiddenFilesWhitelist]);
 
   const getSubfolderContents = useCallback(async (folderPath) => {
     try {
@@ -224,6 +226,7 @@ export const useFileOperations = ({
 
       setPreviewFilePath(filePath);
       addRecentFile(filePath);
+      addRecentFolder(getParentPath(filePath));
 
       if (revealInSidebar) {
         revealFileInSidebar(filePath);
@@ -241,6 +244,7 @@ export const useFileOperations = ({
     // Open in tab
     await openFileInTab(filePath, content);
     addRecentFile(filePath);
+    addRecentFolder(getParentPath(filePath));
 
     if (revealInSidebar) {
       revealFileInSidebar(filePath);
@@ -270,6 +274,7 @@ export const useFileOperations = ({
     });
     if (!filePath) return null;
 
+    const folderPath = getParentPath(filePath);
     await writeTextFile(filePath, content);
 
     // Update the tab with new path
@@ -278,8 +283,8 @@ export const useFileOperations = ({
     }
 
     addRecentFile(filePath);
+    addRecentFolder(folderPath);
 
-    const folderPath = getParentPath(filePath);
     if (folderPath) {
       await loadFolderContents(folderPath, { preserveExpanded: true });
     }
@@ -287,6 +292,7 @@ export const useFileOperations = ({
     return filePath;
   }, [
     addRecentFile,
+    addRecentFolder,
     currentFilePath,
     getParentPath,
     loadFolderContents,

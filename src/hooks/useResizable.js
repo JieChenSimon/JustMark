@@ -39,5 +39,5 @@ export function useResizable(initialWidth = 50, minWidth = 20, maxWidth = 80) {
     };
   }, [isDragging, minWidth, maxWidth]);
 
-  return { width, isDragging, handleMouseDown };
+  return { width, setWidth, isDragging, handleMouseDown };
 }

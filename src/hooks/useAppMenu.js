@@ -9,7 +9,15 @@ const formatRecentFileLabel = (path) => {
   return parentName ? `${fileName} — ${parentName}` : fileName;
 };
 
-export function useAppMenu(actions, recentFiles) {
+const formatRecentFolderLabel = (path) => {
+  const segments = path.split('/').filter(Boolean);
+  const folderName = segments.at(-1) || path;
+  const parentName = segments.at(-2);
+
+  return parentName ? `${folderName} — ${parentName}` : folderName;
+};
+
+export function useAppMenu(actions, recentFiles, recentFolders = []) {
   const actionsRef = useRef(actions);
 
   useEffect(() => {
@@ -23,18 +31,37 @@ export function useAppMenu(actions, recentFiles) {
       try {
         const openRecentSubmenu = await Submenu.new({
           text: 'Open Recent',
-          items: recentFiles.length > 0
+          items: (recentFiles.length > 0 || recentFolders.length > 0)
             ? [
-                ...await Promise.all(recentFiles.map((path, index) => MenuItem.new({
-                  text: formatRecentFileLabel(path),
-                  id: `file-open-recent-${index}`,
-                  action: () => actionsRef.current.openRecentFile?.(path)
-                }))),
+                ...(recentFiles.length > 0
+                  ? [
+                      await Submenu.new({
+                        text: 'Documents',
+                        items: await Promise.all(recentFiles.map((path, index) => MenuItem.new({
+                          text: formatRecentFileLabel(path),
+                          id: `file-open-recent-${index}`,
+                          action: () => actionsRef.current.openRecentFile?.(path)
+                        })))
+                      })
+                    ]
+                  : []),
+                ...(recentFolders.length > 0
+                  ? [
+                      await Submenu.new({
+                        text: 'Workspaces',
+                        items: await Promise.all(recentFolders.map((path, index) => MenuItem.new({
+                          text: formatRecentFolderLabel(path),
+                          id: `file-open-recent-folder-${index}`,
+                          action: () => actionsRef.current.openRecentFolder?.(path)
+                        })))
+                      })
+                    ]
+                  : []),
                 await PredefinedMenuItem.new({ item: 'Separator' }),
                 await MenuItem.new({
                   text: 'Clear Menu',
                   id: 'file-open-recent-clear',
-                  action: () => actionsRef.current.clearRecentFiles?.()
+                  action: () => actionsRef.current.clearRecentHistory?.()
                 })
               ]
             : [
@@ -117,8 +144,8 @@ export function useAppMenu(actions, recentFiles) {
             await MenuItem.new({ text: 'Toggle Sidebar', id: 'view-sidebar', accelerator: 'CmdOrCtrl+\\', action: () => actionsRef.current.toggleSidebar?.() }),
             await MenuItem.new({ text: 'Toggle Preview', id: 'view-preview', accelerator: 'CmdOrCtrl+Shift+\\', action: () => actionsRef.current.togglePreview?.() }),
             await PredefinedMenuItem.new({ item: 'Separator' }),
-            await MenuItem.new({ text: 'Increase Text Size', id: 'view-font-increase', accelerator: 'CmdOrCtrl+=', action: () => actionsRef.current.increaseFont?.() }),
-            await MenuItem.new({ text: 'Decrease Text Size', id: 'view-font-decrease', accelerator: 'CmdOrCtrl+-', action: () => actionsRef.current.decreaseFont?.() }),
+            await MenuItem.new({ text: 'Increase Editor Text Size', id: 'view-font-increase', accelerator: 'CmdOrCtrl+=', action: () => actionsRef.current.increaseFont?.() }),
+            await MenuItem.new({ text: 'Decrease Editor Text Size', id: 'view-font-decrease', accelerator: 'CmdOrCtrl+-', action: () => actionsRef.current.decreaseFont?.() }),
             await PredefinedMenuItem.new({ item: 'Separator' }),
             await MenuItem.new({ text: 'Toggle Appearance', id: 'view-theme', accelerator: 'CmdOrCtrl+Alt+T', action: () => actionsRef.current.toggleTheme?.() })
           ]
@@ -165,5 +192,5 @@ export function useAppMenu(actions, recentFiles) {
     return () => {
       cancelled = true;
     };
-  }, [recentFiles]);
+  }, [recentFiles, recentFolders]);
 }

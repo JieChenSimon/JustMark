@@ -31,7 +31,8 @@ const EditorArea = forwardRef(({
   activeFilePath,
   onSwitchFile,
   onCloseFile,
-  onNewFile
+  onNewFile,
+  layoutPreset = 'prose'
 }, ref) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const textareaRef = useRef(null);
@@ -193,20 +194,24 @@ const EditorArea = forwardRef(({
       className="jm-editor-surface relative flex h-full min-h-0 flex-1 flex-col overflow-hidden"
       style={{ backgroundColor: appBgColor }}
     >
-      <textarea
-        ref={textareaRef}
-        className={`min-h-0 flex-1 resize-none bg-transparent px-8 pb-16 pt-8 outline-none placeholder-gray-300 dark:placeholder-gray-600 ${currentFont.size} ${currentFont.leading}`}
-        style={{
-          fontFamily: currentFontFamily.family,
-          color: appTextColor
-        }}
-        value={markdown}
-        onChange={onMarkdownChange}
-        onScroll={handleScroll}
-        onPaste={handlePaste}
-        placeholder="Start writing..."
-        spellCheck="false"
-      />
+      <div className={`jm-editor-body jm-editor-body--${layoutPreset} min-h-0 flex-1`}>
+        <textarea
+          ref={textareaRef}
+          className={`jm-editor-textarea jm-editor-textarea--${layoutPreset} min-h-0 w-full flex-1 resize-none bg-transparent outline-none placeholder-black/20 dark:placeholder-white/20 ${currentFont.size} ${currentFont.leading}`}
+          style={{
+            fontFamily: currentFontFamily.family,
+            color: appTextColor,
+            fontSize: `${currentFont.editorPx}px`,
+            lineHeight: currentFont.editorLineHeight,
+          }}
+          value={markdown}
+          onChange={onMarkdownChange}
+          onScroll={handleScroll}
+          onPaste={handlePaste}
+          placeholder="Start writing..."
+          spellCheck="false"
+        />
+      </div>
 
       {/* 搜索替换面板 */}
       <SearchReplace
@@ -237,14 +242,14 @@ const EditorArea = forwardRef(({
         <div className={`absolute left-4 z-20 ${hasTabs ? 'bottom-10' : 'bottom-4'}`}>
           <button
             onClick={() => onToggleSidebar(!sidebarVisible)}
-            className={`flex h-7 w-7 items-center justify-center rounded-lg backdrop-blur-md transition-all duration-200 ${
+            className={`flex h-7 w-7 items-center justify-center rounded-lg border backdrop-blur-md transition-colors duration-200 ${
               sidebarVisible
-                ? 'bg-black/90 dark:bg-white/90'
-                : 'bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10'
+                ? 'border-black/8 bg-white/84 dark:border-white/10 dark:bg-neutral-800/72'
+                : 'border-black/5 bg-white/42 hover:bg-white/64 dark:border-white/10 dark:bg-neutral-900/28 dark:hover:bg-neutral-800/48'
             }`}
             title={sidebarVisible ? 'Hide Explorer' : 'Show Explorer'}
           >
-            <IconSidebar className={`h-3.5 w-3.5 ${sidebarVisible ? 'text-white dark:text-black' : 'text-black/60 dark:text-white/60'}`} />
+            <IconSidebar className={`h-3.5 w-3.5 ${sidebarVisible ? 'text-black/62 dark:text-white/72' : 'text-black/34 dark:text-white/42'}`} />
           </button>
         </div>
       )}

@@ -36,6 +36,9 @@ import { parseTags, sortEntries, getTagColor } from './utils/fileHelpers';
 import { createUniqueHeadingId, extractTocHeadings, flattenReactNodeText, getLineStartOffset } from './utils/toc';
 import { bringAllToFront, openDocumentWindow, openPreferencesWindow } from './utils/windows';
 
+const CODE_LIKE_FILE_PATTERN = /\.(json|jsonc|ya?ml|toml|ini|conf|env|xml|log|sh|bash|zsh|fish|js|jsx|ts|tsx|mjs|cjs|py|rs|go|java|c|cc|cpp|h|hpp|css|scss|less|html?)$/i;
+const SINGLE_FENCED_BLOCK_PATTERN = /^```[\w-]*\n[\s\S]*\n```$/;
+
 function App() {
   // Multi-file tab state
   const [openFiles, setOpenFiles] = useLocalStorage('openFiles', []);
@@ -60,6 +63,8 @@ function App() {
   const {
     isDarkMode,
     currentFont,
+    currentEditorFont,
+    currentPreviewFont,
     currentFontFamily,
     currentBgColor,
     appBgColor,
@@ -86,11 +91,19 @@ function App() {
     showHiddenFiles,
     hiddenFilesWhitelist
   } = useSettings();
-  const { recentFiles, addRecentFile, clearRecentFiles, replaceRecentFilePath, removeRecentFilePrefix } = useRecentFiles();
+  const {
+    recentFiles,
+    recentFolders,
+    addRecentFile,
+    addRecentFolder,
+    clearRecentHistory,
+    replaceRecentFilePath,
+    removeRecentFilePrefix
+  } = useRecentFiles();
   const { chars, words, lines } = useWordCount(markdown);
-  const { sidebarWidth, isDraggingSidebar, setIsDraggingSidebar } = useWindowManager();
+  const { sidebarWidth, setSidebarWidth, isDraggingSidebar, setIsDraggingSidebar } = useWindowManager();
   const { isExporting, exportToPDF, exportToDOCX } = useExportManager();
-  const { width: editorWidth, isDragging, handleMouseDown } = useResizable(50, 30, 70);
+  const { width: editorWidth, setWidth: setEditorWidth, isDragging, handleMouseDown } = useResizable(60, 38, 76);
   const { clipFromSelection, isClipping } = useWebClipper();
 
   const [currentFolder, setCurrentFolder] = useLocalStorage('currentFolder', null);
@@ -113,6 +126,25 @@ function App() {
   const appWindow = getCurrentWindow();
   const shouldAnimateLayout = !isDragging && !isDraggingSidebar;
   const isTextDocument = !currentFilePath || /\.(md|markdown|txt)$/i.test(currentFilePath);
+  const isSingleFencedBlock = useMemo(() => SINGLE_FENCED_BLOCK_PATTERN.test(markdown.trim()), [markdown]);
+  const isCodeLikeDocument = useMemo(() => {
+    if (currentFilePath && CODE_LIKE_FILE_PATTERN.test(currentFilePath)) {
+      return true;
+    }
+
+    if (isSingleFencedBlock) {
+      return true;
+    }
+
+    const trimmed = markdown.trim();
+    if (!trimmed) {
+      return false;
+    }
+
+    return /^[\[{][\s\S]*[\]}]$/.test(trimmed) && !/^#{1,6}\s/m.test(trimmed);
+  }, [currentFilePath, isSingleFencedBlock, markdown]);
+  const layoutPreset = isCodeLikeDocument ? 'code' : 'prose';
+  const previewFontSize = isCodeLikeDocument ? currentPreviewFont.codePreviewSize : currentPreviewFont.previewSize;
   const tocItems = useMemo(
     () => (isTextDocument ? extractTocHeadings(markdown) : []),
     [isTextDocument, markdown]
@@ -144,6 +176,11 @@ function App() {
       h6: createHeading('h6'),
     };
   }, [deferredMarkdown]);
+
+  useEffect(() => {
+    const targetEditorWidth = isCodeLikeDocument ? 52 : 60;
+    setEditorWidth(targetEditorWidth);
+  }, [isCodeLikeDocument, setEditorWidth]);
 
   const setActiveMarkdown = useCallback((nextMarkdown) => {
     markdownRef.current = nextMarkdown;
@@ -289,6 +326,7 @@ function App() {
     currentFolder,
     setHasUnsavedChanges: () => {}, // No longer needed, derived from state
     addRecentFile,
+    addRecentFolder,
     setCurrentFolder,
     setFolderContents,
     setExpandedFolders,
@@ -548,7 +586,8 @@ function App() {
     openFile: () => requestActionWithUnsavedGuard(async () => fileOps.handleOpenFile()),
     openFolder: () => requestActionWithUnsavedGuard(handleOpenFolder),
     openRecentFile: (path) => requestActionWithUnsavedGuard(async () => fileOps.openFileInEditor(path)),
-    clearRecentFiles: () => clearRecentFiles(),
+    openRecentFolder: (path) => requestActionWithUnsavedGuard(async () => fileOps.loadFolderContents(path)),
+    clearRecentHistory: () => clearRecentHistory(),
     save: () => void fileOps.handleSave(),
     saveAs: () => void fileOps.handleSaveAs(),
     exportPDF: () => void handleExportPDF(),
@@ -575,11 +614,11 @@ function App() {
     toggleTheme: () => toggleTheme(),
     minimizeWindow: () => void appWindow.minimize(),
     maximizeWindow: () => void appWindow.toggleMaximize(),
-  }, recentFiles);
+  }, recentFiles, recentFolders);
 
   useEffect(() => {
-    invoke('setup_native_toolbar');
-    invoke('setup_native_splitview');
+    invoke('setup_native_toolbar').catch(() => {});
+    invoke('setup_native_splitview').catch(() => {});
   }, []);
 
   return (
@@ -673,18 +712,12 @@ function App() {
           onMouseDown={sidebarVisible ? () => setIsDraggingSidebar(true) : undefined}
           className={`flex-shrink-0 flex justify-center cursor-col-resize ${shouldAnimateLayout ? 'transition-[width,opacity] duration-300 ease-out' : ''}`}
           style={{
-            width: sidebarVisible ? '6px' : '0px',
+            width: sidebarVisible ? '5px' : '0px',
             opacity: sidebarVisible ? 1 : 0,
             pointerEvents: sidebarVisible ? 'auto' : 'none',
           }}
         >
-          <div
-            className={`h-full w-px transition-colors duration-200 ${
-              isDraggingSidebar
-                ? 'bg-blue-500'
-                : 'bg-slate-200/70 dark:bg-white/10'
-            }`}
-          />
+          <div className="h-full w-px bg-[var(--jm-divider)]" />
         </div>
 
         <section
@@ -696,7 +729,7 @@ function App() {
             markdown={markdown}
             onMarkdownChange={handleMarkdownChange}
             onImagePasted={handleImagePasted}
-            currentFont={currentFont}
+            currentFont={currentEditorFont || currentFont}
             currentFontFamily={currentFontFamily}
             appBgColor={appBgColor}
             appTextColor={appTextColor}
@@ -714,18 +747,23 @@ function App() {
             onSwitchFile={switchToFile}
             onCloseFile={closeFile}
             onNewFile={handleNewFile}
+            layoutPreset={layoutPreset}
           />
         </section>
 
         <div
           onMouseDown={previewVisible ? handleMouseDown : undefined}
-          className={`flex-shrink-0 cursor-col-resize hover:bg-blue-500/50 ${shouldAnimateLayout ? 'transition-[width,opacity,background-color] duration-300 ease-out' : 'transition-colors'} ${isDragging ? 'bg-blue-500' : ''}`}
+          className={`flex-shrink-0 flex justify-center cursor-col-resize ${shouldAnimateLayout ? 'transition-[width,opacity] duration-300 ease-out' : ''}`}
           style={{
-            width: previewVisible ? '3px' : '0px',
+            width: previewVisible ? '5px' : '0px',
             opacity: previewVisible ? 1 : 0,
             pointerEvents: previewVisible ? 'auto' : 'none',
           }}
-        />
+        >
+          <div
+            className={`h-full w-px transition-colors duration-200 ${isDragging ? 'bg-[var(--jm-accent)]' : 'bg-[var(--jm-divider)]'}`}
+          />
+        </div>
 
         <section
           className={`jm-preview-surface flex min-h-0 flex-col overflow-hidden ${shouldAnimateLayout ? 'transition-[width,opacity,transform] duration-300 ease-out' : ''}`}
@@ -733,7 +771,6 @@ function App() {
             width: previewVisible ? `${100 - editorWidth}%` : '0%',
             opacity: previewVisible ? 1 : 0,
             transform: previewVisible ? 'translateX(0)' : 'translateX(12px)',
-            backgroundColor: previewMode === 'markdown' ? previewBgColor : 'rgba(226, 232, 240, 0.52)',
             color: previewTextColor,
             pointerEvents: previewVisible ? 'auto' : 'none',
           }}
@@ -743,31 +780,59 @@ function App() {
               <FilePreview filePath={previewFilePath} />
             </div>
           ) : previewMode === 'markdown' ? (
-            <div className="jm-preview-scroll min-h-0 flex-1 overflow-y-auto px-8 py-8">
-              <article
-                ref={previewSectionRef}
-                className="jm-markdown-preview mx-auto max-w-4xl"
-                style={{
-                  color: previewTextColor,
-                  fontSize: currentFont.previewSize,
-                  fontFamily: currentFontFamily.family,
-                }}
-              >
-                <MarkdownPreview
-                  content={deferredMarkdown}
-                  attachmentFolder={attachmentFolder}
-                  currentFilePath={currentFilePath}
-                  components={markdownPreviewComponents}
-                />
-              </article>
-            </div>
+            layoutPreset === 'code' ? (
+              <div className="jm-preview-scroll jm-preview-scroll--code min-h-0 flex-1 overflow-x-auto overflow-y-auto">
+                <div className="jm-preview-paper-shell jm-preview-paper-shell--code">
+                  <div
+                    ref={previewSectionRef}
+                    className="jm-preview-code-plane jm-markdown-preview jm-markdown-preview--code min-h-full"
+                    style={{
+                      backgroundColor: 'transparent',
+                      color: previewTextColor,
+                      fontSize: previewFontSize,
+                      fontFamily: currentFontFamily.family,
+                    }}
+                  >
+                    <MarkdownPreview
+                      content={deferredMarkdown}
+                      attachmentFolder={attachmentFolder}
+                      currentFilePath={currentFilePath}
+                      components={markdownPreviewComponents}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="jm-preview-scroll min-h-0 flex-1 overflow-x-auto overflow-y-auto px-4 py-5">
+                <div className="jm-preview-paper-shell jm-preview-paper-shell--prose">
+                  <article
+                    ref={previewSectionRef}
+                    className="jm-preview-paper jm-markdown-preview jm-preview-paper--prose jm-markdown-preview--prose"
+                    style={{
+                      backgroundColor: previewBgColor,
+                      color: previewTextColor,
+                      fontSize: previewFontSize,
+                      fontFamily: currentFontFamily.family,
+                    }}
+                  >
+                    <MarkdownPreview
+                      content={deferredMarkdown}
+                      attachmentFolder={attachmentFolder}
+                      currentFilePath={currentFilePath}
+                      components={markdownPreviewComponents}
+                    />
+                  </article>
+                </div>
+              </div>
+            )
           ) : (
             <div className="min-h-0 flex-1 overflow-hidden">
               <PDFPreview
                 content={deferredMarkdown}
                 attachmentFolder={attachmentFolder}
                 fontFamily={currentFontFamily.family}
-                fontSize={currentFont.previewSize}
+                fontSize={previewFontSize}
+                layoutPreset={layoutPreset}
                 pageRef={previewSectionRef}
               />
             </div>

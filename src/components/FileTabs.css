@@ -2,8 +2,8 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 26px;
-  padding: 2px 8px 3px;
+  height: 24px;
+  padding: 1px 8px 2px;
   background: transparent;
   user-select: none;
   -webkit-user-select: none;
@@ -34,74 +34,52 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 19px;
-  min-width: 76px;
+  gap: 5px;
+  height: 18px;
+  min-width: 72px;
   max-width: 144px;
-  padding: 0 6px 0 7px;
+  padding: 0 6px 0 6px;
   border: none;
   outline: none;
   border-radius: 6px 6px 4px 4px;
   background: transparent;
-  color: rgba(15, 23, 42, 0.7);
+  color: rgba(15, 23, 42, 0.56);
   cursor: pointer;
   flex-shrink: 0;
   transition:
     background-color 140ms ease,
     color 140ms ease,
-    box-shadow 140ms ease,
-    transform 140ms ease;
+    box-shadow 140ms ease;
 }
 
 .dark .jm-file-tab {
-  color: rgba(226, 232, 240, 0.68);
-}
-
-.jm-file-tab::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0));
-  opacity: 0;
-  transition: opacity 140ms ease;
-  pointer-events: none;
+  color: rgba(226, 232, 240, 0.5);
 }
 
 .jm-file-tab:hover:not(.active) {
-  background: rgba(15, 23, 42, 0.045);
-  color: rgba(15, 23, 42, 0.92);
+  background: rgba(15, 23, 42, 0.035);
+  color: rgba(15, 23, 42, 0.74);
 }
 
 .dark .jm-file-tab:hover:not(.active) {
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(248, 250, 252, 0.94);
-}
-
-.jm-file-tab:hover::before,
-.jm-file-tab.active::before {
-  opacity: 1;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(248, 250, 252, 0.74);
 }
 
 .jm-file-tab.active {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 249, 251, 0.96) 100%);
-  color: rgba(15, 23, 42, 0.98);
+  background: rgba(255, 255, 255, 0.72);
+  color: rgba(15, 23, 42, 0.82);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.72),
     inset 0 0 0 0.5px rgba(15, 23, 42, 0.04),
-    0 1px 2px rgba(15, 23, 42, 0.05),
-    0 6px 16px rgba(15, 23, 42, 0.05);
+    0 1px 2px rgba(15, 23, 42, 0.03);
 }
 
 .dark .jm-file-tab.active {
-  background:
-    linear-gradient(180deg, rgba(86, 88, 92, 0.88) 0%, rgba(66, 67, 71, 0.9) 100%);
-  color: rgba(248, 250, 252, 0.98);
+  background: rgba(76, 77, 81, 0.58);
+  color: rgba(248, 250, 252, 0.8);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
     inset 0 0 0 0.5px rgba(255, 255, 255, 0.04),
-    0 1px 2px rgba(0, 0, 0, 0.16);
+    0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
 .jm-file-tab:focus-visible {
@@ -120,15 +98,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   flex-shrink: 0;
 }
 
 .jm-tab-file-dot,
 .jm-tab-unsaved-dot {
-  width: 4px;
-  height: 4px;
+  width: 3px;
+  height: 3px;
   border-radius: 999px;
 }
 
@@ -141,13 +119,13 @@
 }
 
 .jm-tab-unsaved-dot {
-  background: linear-gradient(180deg, #50a7ff 0%, #007aff 100%);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
+  background: #007aff;
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.08);
 }
 
 .dark .jm-tab-unsaved-dot {
-  background: linear-gradient(180deg, #6ab7ff 0%, #0a84ff 100%);
-  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.18);
+  background: #0a84ff;
+  box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.12);
 }
 
 .jm-tab-name {
@@ -157,33 +135,32 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: left;
-  font-size: 11px;
+  font-size: 10.5px;
   line-height: 1;
-  letter-spacing: -0.012em;
+  letter-spacing: -0.01em;
 }
 
 .jm-tab-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   padding: 0;
   border: none;
   border-radius: 999px;
   background: transparent;
-  color: rgba(15, 23, 42, 0.42);
+  color: rgba(15, 23, 42, 0.32);
   opacity: 0;
   flex-shrink: 0;
   transition:
     opacity 120ms ease,
     background-color 120ms ease,
-    color 120ms ease,
-    transform 120ms ease;
+    color 120ms ease;
 }
 
 .dark .jm-tab-close {
-  color: rgba(226, 232, 240, 0.42);
+  color: rgba(226, 232, 240, 0.32);
 }
 
 .jm-file-tab:hover .jm-tab-close,
@@ -201,43 +178,34 @@
   color: rgba(248, 250, 252, 0.9);
 }
 
-.jm-tab-close:active {
-  transform: scale(0.92);
-}
-
 .jm-file-tab-new {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   padding: 0;
   border: none;
   border-radius: 999px;
   background: transparent;
-  color: rgba(15, 23, 42, 0.52);
+  color: rgba(15, 23, 42, 0.38);
   cursor: pointer;
   flex-shrink: 0;
   transition:
     background-color 140ms ease,
-    color 140ms ease,
-    transform 140ms ease;
+    color 140ms ease;
 }
 
 .dark .jm-file-tab-new {
-  color: rgba(226, 232, 240, 0.52);
+  color: rgba(226, 232, 240, 0.38);
 }
 
 .jm-file-tab-new:hover {
-  background: rgba(15, 23, 42, 0.06);
-  color: rgba(15, 23, 42, 0.88);
+  background: rgba(15, 23, 42, 0.045);
+  color: rgba(15, 23, 42, 0.68);
 }
 
 .dark .jm-file-tab-new:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(248, 250, 252, 0.9);
-}
-
-.jm-file-tab-new:active {
-  transform: scale(0.92);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(248, 250, 252, 0.68);
 }

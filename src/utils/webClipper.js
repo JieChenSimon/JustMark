@@ -69,6 +69,57 @@ function createTurndownService(baseUrl) {
     // Use GFM plugin for tables, strikethrough, etc.
     turndownService.use(gfm);
 
+    const escapeTableCell = (value) => value
+        .replace(/\|/g, '\\|')
+        .replace(/\n+/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+    // Convert common HTML tables into Markdown tables so clipped content
+    // stays editable in the source view instead of leaking raw HTML.
+    turndownService.addRule('htmlTables', {
+        filter: (node) => node.nodeName === 'TABLE',
+        replacement: (_content, node) => {
+            const rows = Array.from(node.querySelectorAll('tr'))
+                .map((row) => Array.from(row.children)
+                    .filter((cell) => ['TD', 'TH'].includes(cell.nodeName))
+                    .map((cell) => escapeTableCell(cell.textContent || '')))
+                .filter((cells) => cells.length > 0);
+
+            if (rows.length === 0) {
+                return '\n';
+            }
+
+            const hasHeaderRow = Array.from(node.querySelectorAll('tr')).some((row) =>
+                Array.from(row.children).some((cell) => cell.nodeName === 'TH')
+            );
+
+            let header;
+            let bodyRows;
+
+            if (hasHeaderRow) {
+                header = rows[0];
+                bodyRows = rows.slice(1);
+            } else if (rows.every((cells) => cells.length === 2)) {
+                header = ['Field', 'Value'];
+                bodyRows = rows;
+            } else {
+                const columnCount = Math.max(...rows.map((cells) => cells.length));
+                header = Array.from({ length: columnCount }, (_, index) => `Column ${index + 1}`);
+                bodyRows = rows.map((cells) => [...cells, ...Array(Math.max(0, columnCount - cells.length)).fill('')]);
+            }
+
+            const separator = header.map(() => '---');
+            const tableLines = [
+                `| ${header.join(' | ')} |`,
+                `| ${separator.join(' | ')} |`,
+                ...bodyRows.map((cells) => `| ${cells.join(' | ')} |`)
+            ];
+
+            return `\n${tableLines.join('\n')}\n`;
+        }
+    });
+
     // Custom image handling with absolute URLs
     turndownService.addRule('images', {
         filter: 'img',

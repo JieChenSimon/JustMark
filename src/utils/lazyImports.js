@@ -15,3 +15,5 @@ export const loadDocx = () => loadCachedModule('docx', () => import('docx'));
 export const loadMermaid = () => loadCachedModule('mermaid', () => import('mermaid'));
 export const loadRemarkMath = () => loadCachedModule('remark-math', () => import('remark-math'));
 export const loadRehypeKatex = () => loadCachedModule('rehype-katex', () => import('rehype-katex'));
+export const loadRehypeRaw = () => loadCachedModule('rehype-raw', () => import('rehype-raw'));
+export const loadRehypeSanitize = () => loadCachedModule('rehype-sanitize', () => import('rehype-sanitize'));

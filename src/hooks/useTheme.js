@@ -8,7 +8,8 @@ import { loadSavedState, saveState, subscribeToStoredState } from '../utils/stor
  */
 export function useTheme() {
     const [isDarkMode, setIsDarkMode] = useState(() => loadSavedState('isDarkMode', false));
-    const [fontIndex, setFontIndex] = useState(() => loadSavedState('fontIndex', 1));
+    const [editorFontIndex, setEditorFontIndex] = useState(() => loadSavedState('editorFontIndex', loadSavedState('fontIndex', 1)));
+    const [previewFontIndex, setPreviewFontIndex] = useState(() => loadSavedState('previewFontIndex', Math.max(0, loadSavedState('fontIndex', 1) - 1)));
     const [fontFamilyIndex, setFontFamilyIndex] = useState(() => loadSavedState('fontFamilyIndex', 1));
     const [bgColorIndex, setBgColorIndex] = useState(() => loadSavedState('bgColorIndex', 0));
     const [previewBgColorIndex, setPreviewBgColorIndex] = useState(() => loadSavedState('previewBgColorIndex', null));
@@ -21,18 +22,21 @@ export function useTheme() {
 
     // 持久化
     useEffect(() => { saveState('isDarkMode', isDarkMode); }, [isDarkMode]);
-    useEffect(() => { saveState('fontIndex', fontIndex); }, [fontIndex]);
+    useEffect(() => { saveState('editorFontIndex', editorFontIndex); }, [editorFontIndex]);
+    useEffect(() => { saveState('previewFontIndex', previewFontIndex); }, [previewFontIndex]);
     useEffect(() => { saveState('fontFamilyIndex', fontFamilyIndex); }, [fontFamilyIndex]);
     useEffect(() => { saveState('bgColorIndex', bgColorIndex); }, [bgColorIndex]);
     useEffect(() => { saveState('previewBgColorIndex', previewBgColorIndex); }, [previewBgColorIndex]);
     useEffect(() => subscribeToStoredState('isDarkMode', setIsDarkMode), []);
-    useEffect(() => subscribeToStoredState('fontIndex', setFontIndex), []);
+    useEffect(() => subscribeToStoredState('editorFontIndex', setEditorFontIndex), []);
+    useEffect(() => subscribeToStoredState('previewFontIndex', setPreviewFontIndex), []);
     useEffect(() => subscribeToStoredState('fontFamilyIndex', setFontFamilyIndex), []);
     useEffect(() => subscribeToStoredState('bgColorIndex', setBgColorIndex), []);
     useEffect(() => subscribeToStoredState('previewBgColorIndex', setPreviewBgColorIndex), []);
 
     // 派生值
-    const currentFont = FONT_OPTIONS[fontIndex];
+    const currentEditorFont = FONT_OPTIONS[editorFontIndex];
+    const currentPreviewFont = FONT_OPTIONS[previewFontIndex];
     const currentFontFamily = FONT_FAMILIES[fontFamilyIndex];
     const currentBgColor = BACKGROUND_COLORS[bgColorIndex];
 
@@ -50,17 +54,19 @@ export function useTheme() {
     }, []);
 
     const increaseFontSize = useCallback(() => {
-        setFontIndex(prev => Math.min(prev + 1, FONT_OPTIONS.length - 1));
+        setEditorFontIndex(prev => Math.min(prev + 1, FONT_OPTIONS.length - 1));
     }, []);
 
     const decreaseFontSize = useCallback(() => {
-        setFontIndex(prev => Math.max(prev - 1, 0));
+        setEditorFontIndex(prev => Math.max(prev - 1, 0));
     }, []);
 
     return {
         // 状态
         isDarkMode, setIsDarkMode,
-        fontIndex, setFontIndex,
+        fontIndex: editorFontIndex, setFontIndex: setEditorFontIndex,
+        editorFontIndex, setEditorFontIndex,
+        previewFontIndex, setPreviewFontIndex,
         fontFamilyIndex, setFontFamilyIndex,
         bgColorIndex, setBgColorIndex,
         previewBgColorIndex, setPreviewBgColorIndex,
@@ -72,7 +78,9 @@ export function useTheme() {
         showBgColorWarning, setShowBgColorWarning,
 
         // 派生值
-        currentFont,
+        currentFont: currentEditorFont,
+        currentEditorFont,
+        currentPreviewFont,
         currentFontFamily,
         currentBgColor,
         appBgColor,

@@ -35,16 +35,16 @@ export default function AppToolbar({
       </div>
 
       <div className="flex-1 flex justify-center px-4">
-        <div className="jm-title-badge max-w-[420px]">
-          <div className="flex h-6 w-6 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+        <div className="jm-title-badge max-w-[360px] gap-2">
+          <div className="flex h-5 w-5 items-center justify-center rounded-lg text-black/30 dark:text-white/28">
             <IconDocument className="h-4 w-4" />
           </div>
           <div className="min-w-0 text-center">
-            <div className="truncate text-[12px] font-semibold text-slate-800 dark:text-slate-100">
+            <div className="truncate text-[12px] font-medium text-[color:var(--jm-text)]">
               {currentFilePath ? currentFilePath.split('/').pop() : 'Untitled'}
             </div>
-            <div className="truncate text-[10px] text-slate-500 dark:text-slate-400">
-              {hasUnsavedChanges ? 'Edited, not yet saved' : currentFolder ? currentFolder.split('/').pop() : 'JustMark Document'}
+            <div className="truncate text-[10px] text-black/32 dark:text-white/28">
+              {hasUnsavedChanges ? 'Unsaved changes' : currentFolder ? currentFolder.split('/').pop() : 'Writing Space'}
             </div>
           </div>
         </div>

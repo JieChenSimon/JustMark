@@ -8,6 +8,7 @@ export default function PDFPreview({
   attachmentFolder,
   fontFamily,
   fontSize,
+  layoutPreset = 'prose',
   pageRef,
 }) {
   const containerRef = useRef(null);
@@ -18,7 +19,7 @@ export default function PDFPreview({
       const container = containerRef.current;
       if (!container) return;
 
-      const horizontalPadding = 48;
+      const horizontalPadding = layoutPreset === 'code' ? 36 : 48;
       const availableWidth = Math.max(container.clientWidth - horizontalPadding, 320);
       setScale(Math.min(1, availableWidth / A4_WIDTH_PX));
     };
@@ -37,19 +38,21 @@ export default function PDFPreview({
       resizeObserver.disconnect();
       window.removeEventListener('resize', updateScale);
     };
-  }, []);
+  }, [layoutPreset]);
 
   return (
     <div ref={containerRef} className="jm-pdf-canvas">
-      <div className="jm-pdf-scale-shell" style={{ transform: `scale(${scale})` }}>
-        <article
-          id="print-target"
-          ref={pageRef}
-          className="jm-pdf-page jm-markdown-preview"
-          style={{ fontFamily, fontSize }}
-        >
-          <MarkdownPreview content={content} attachmentFolder={attachmentFolder} />
-        </article>
+      <div className={`jm-preview-paper-shell ${layoutPreset === 'code' ? 'jm-preview-paper-shell--code' : 'jm-preview-paper-shell--prose'}`}>
+        <div className="jm-pdf-scale-shell" style={{ transform: `scale(${scale})` }}>
+          <article
+            id="print-target"
+            ref={pageRef}
+            className={`jm-pdf-page jm-markdown-preview ${layoutPreset === 'code' ? 'jm-preview-paper--code jm-markdown-preview--code' : 'jm-preview-paper--prose jm-markdown-preview--prose'}`}
+            style={{ fontFamily, fontSize }}
+          >
+            <MarkdownPreview content={content} attachmentFolder={attachmentFolder} />
+          </article>
+        </div>
       </div>
     </div>
   );

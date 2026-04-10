@@ -70,8 +70,10 @@ export default function PreferencesWindow() {
   const {
     isDarkMode,
     setIsDarkMode,
-    fontIndex,
-    setFontIndex,
+    editorFontIndex,
+    setEditorFontIndex,
+    previewFontIndex,
+    setPreviewFontIndex,
     fontFamilyIndex,
     setFontFamilyIndex,
     bgColorIndex,
@@ -198,16 +200,31 @@ export default function PreferencesWindow() {
                   )}
                 />
                 <PreferenceRow
-                  label="Text Size"
-                  hint="Affects both the editor and preview."
+                  label="Editor Text Size"
+                  hint="Controls the writing size in the editor."
                   control={(
                     <select
-                      value={fontIndex}
-                      onChange={(event) => setFontIndex(Number(event.target.value))}
+                      value={editorFontIndex}
+                      onChange={(event) => setEditorFontIndex(Number(event.target.value))}
                       className="w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
                     >
                       {FONT_OPTIONS.map((option, index) => (
-                        <option key={option.label} value={index}>{option.name}</option>
+                        <option key={option.label} value={index}>{option.editorPx}px</option>
+                      ))}
+                    </select>
+                  )}
+                />
+                <PreferenceRow
+                  label="Preview Text Size"
+                  hint="Controls the reading size in markdown and PDF preview."
+                  control={(
+                    <select
+                      value={previewFontIndex}
+                      onChange={(event) => setPreviewFontIndex(Number(event.target.value))}
+                      className="w-full max-w-xs rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[13px] text-slate-900 shadow-sm outline-none transition-colors hover:border-gray-400 focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
+                    >
+                      {FONT_OPTIONS.map((option, index) => (
+                        <option key={option.label} value={index}>{option.previewPx}px</option>
                       ))}
                     </select>
                   )}

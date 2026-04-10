@@ -20,6 +20,33 @@ extern "C" fn toolbar_item(_: &Object, _: Sel, _: id, _: id, _: bool) -> id {
     nil
 }
 
+#[cfg(target_os = "macos")]
+fn make_toolbar_delegate(mut decl: ClassDecl) -> Result<&'static Object, String> {
+    // SAFETY: register() returns a class registered in the global ObjC runtime.
+    // The class persists for the lifetime of the process.
+    // add_method is unsafe but we ensure correct method signatures.
+    let delegate_class = unsafe {
+        decl.add_method(
+            sel!(toolbarDefaultItemIdentifiers:),
+            toolbar_items as extern "C" fn(&Object, Sel, id) -> id,
+        );
+        decl.add_method(
+            sel!(toolbarAllowedItemIdentifiers:),
+            toolbar_items as extern "C" fn(&Object, Sel, id) -> id,
+        );
+        decl.add_method(
+            sel!(toolbar:itemForItemIdentifier:willBeInsertedIntoToolbar:),
+            toolbar_item as extern "C" fn(&Object, Sel, id, id, bool) -> id,
+        );
+        decl.register()
+    };
+    // SAFETY: register() returns a class registered in the global ObjC runtime.
+    // The class persists for the lifetime of the process.
+    let delegate: id = unsafe { msg_send![delegate_class, new] };
+    // SAFETY: newly allocated NSObject is always valid
+    Ok(unsafe { &*(delegate as *const Object) })
+}
+
 #[tauri::command]
 pub fn setup_native_toolbar<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     #[cfg(target_os = "macos")]
@@ -28,30 +55,36 @@ pub fn setup_native_toolbar<R: Runtime>(app: AppHandle<R>) -> Result<(), String>
 
         let window = app.get_webview_window("main")
             .ok_or("Main window not found")?;
+        let ns_window = window.ns_window()
+            .map_err(|e| e.to_string())? as id;
 
+        // Try primary class name, then fallback with timestamp suffix
+        let class_name = "JustMarkToolbarDelegate";
+        let decl = ClassDecl::new(class_name, class!(NSObject));
+
+        let decl = match decl {
+            Some(d) => d,
+            None => {
+                // Class name collision — try with timestamp suffix
+                let suffix = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_nanos())
+                    .unwrap_or(0);
+                let fallback_name = format!("JMToolbar{}", suffix);
+                ClassDecl::new(&fallback_name, class!(NSObject)).ok_or_else(|| {
+                    format!(
+                        "Failed to create ObjC delegate class (neither '{}' nor '{}' available — \
+                        ObjC runtime may be in an inconsistent state)",
+                        class_name, fallback_name
+                    )
+                })?
+            }
+        };
+
+        let delegate = make_toolbar_delegate(decl)?;
+
+        // SAFETY: ns_window is a valid NSWindow, toolbar setup is straightforward
         unsafe {
-            let ns_window = window.ns_window()
-                .map_err(|e| e.to_string())? as id;
-
-            let mut decl = ClassDecl::new("JustMarkToolbarDelegate", class!(NSObject))
-                .ok_or("Failed to create delegate class")?;
-
-            decl.add_method(
-                sel!(toolbarDefaultItemIdentifiers:),
-                toolbar_items as extern "C" fn(&Object, Sel, id) -> id,
-            );
-            decl.add_method(
-                sel!(toolbarAllowedItemIdentifiers:),
-                toolbar_items as extern "C" fn(&Object, Sel, id) -> id,
-            );
-            decl.add_method(
-                sel!(toolbar:itemForItemIdentifier:willBeInsertedIntoToolbar:),
-                toolbar_item as extern "C" fn(&Object, Sel, id, id, bool) -> id,
-            );
-
-            let delegate_class = decl.register();
-            let delegate: id = msg_send![delegate_class, new];
-
             let toolbar: id = msg_send![class!(NSToolbar), alloc];
             let identifier = NSString::alloc(nil).init_str("MainToolbar");
             let toolbar: id = msg_send![toolbar, initWithIdentifier: identifier];
