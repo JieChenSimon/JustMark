@@ -22,7 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-*.md
 
 # macOS / Xcode / SwiftPM local state
 DerivedData/
