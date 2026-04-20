@@ -22,3 +22,22 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# macOS / Xcode / SwiftPM local state
+DerivedData/
+**/xcuserdata/
+**/*.xcuserstate
+macos/JustMark/.build/
+macos/JustMark/.swiftpm/
+
+# Local agent / workflow memory
+.ai/
+AGENTS.md
+CLAUDE.md
+memory.md
+Untitled.md
+
+# Internal-only project notes and specs
+docs/TODO.md
+docs/NATIVE_MIGRATION_PLAN.md
+docs/specs/
