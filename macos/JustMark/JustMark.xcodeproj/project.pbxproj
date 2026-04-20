@@ -1,0 +1,525 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		03BBF5EAA129C3D87B7E2976 /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA7ABA69934AA178829226C0 /* ExportService.swift */; };
+		114C9AD36EE5469482C75855 /* SettingsRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E289262427E1812E88074F9C /* SettingsRootView.swift */; };
+		131B92C97E37B3BEB473475C /* WindowService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF06DE10E016B9BA4801C19 /* WindowService.swift */; };
+		16CECDA91E0F96FFF71E9BBB /* DocumentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBC4C27424D98C2A8019D092 /* DocumentStore.swift */; };
+		17F93229DC4B6C4E82262874 /* AppModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B81B17AFC46AE740A80FED81 /* AppModels.swift */; };
+		33F11444BA76CB6FA0B9A9AE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E23C078DF0ABE11BB0D063CD /* Assets.xcassets */; };
+		35DEC9C90FF9B73641140A61 /* JustMarkNativeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03808650683DA3D3A59AC0A /* JustMarkNativeApp.swift */; };
+		38CF506F8F7160D0CDABEE15 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5445398DCA0E8C4C7FA08F69 /* EditorView.swift */; };
+		3FD2F5F24DC97977A55D00D9 /* DocumentTabStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 988373FC7E3A1DF1C952CB9B /* DocumentTabStripView.swift */; };
+		458B434F2AE80A547A5C4701 /* FileSystemService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7549E7BDA3DB0C2416755766 /* FileSystemService.swift */; };
+		48A0B034D3F98278B26E9C00 /* WebDAVService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7273F4640A26598C641D5D6F /* WebDAVService.swift */; };
+		52A8D2010D50814641DCDB23 /* Down in Frameworks */ = {isa = PBXBuildFile; productRef = BD7FE3F570F2CEC2AF5660F0 /* Down */; };
+		5439DEF0FF19354969D1348F /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FCA2AE866EFBE80E7195497 /* AppEnvironment.swift */; };
+		61C1DB77AEE3BDD9AF285FED /* EditorDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41AF390CD90251B08A97AD8A /* EditorDesignSystem.swift */; };
+		76B3CE0FE98533B16946FC1F /* WorkspaceSplitContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99448EA7BBC74B48D2A15716 /* WorkspaceSplitContainer.swift */; };
+		7FC11C45AFC294DF9A9B3E52 /* AppCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF076CE22D94A406F54C5792 /* AppCommands.swift */; };
+		804F37E25C56DF0FE380476A /* JustMark.icns in Resources */ = {isa = PBXBuildFile; fileRef = 66EA8FD3A6C3C1AAF508AF8E /* JustMark.icns */; };
+		8254AB2B26170E3F100179E1 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AD031A6438C69A953F2D61C /* KeychainStore.swift */; };
+		851A59FC9360F10E3ADF9E49 /* WorkspaceRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C2A421E136C572900DB623F /* WorkspaceRootView.swift */; };
+		86582E0DCE4D8AD56C91F0D9 /* PDFPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62DBEB41EEFC512E018A54DA /* PDFPreviewView.swift */; };
+		88BC26F78095BDDA2001CCDB /* PreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 022B8BFED68CC58F47A4AE88 /* PreviewView.swift */; };
+		90D7017B04A355AE92DEE6B4 /* WindowChromeConfigurator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C08CDA444DDCACF7706E6B42 /* WindowChromeConfigurator.swift */; };
+		94D91B56621A012E0A78C85E /* RecentHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C11AB53C093A228CD00FAA5 /* RecentHistoryStore.swift */; };
+		9D63C49A0883362753FBE76A /* PreviewEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0CA6D7942D13B3B7E3EC9C /* PreviewEngine.swift */; };
+		A2AC9B98D667992755B62BBB /* SettingsStores.swift in Sources */ = {isa = PBXBuildFile; fileRef = F580817CF077896FFC12DC7F /* SettingsStores.swift */; };
+		A720239FB6ED31E6E34C652F /* MarkdownFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ECE93DB36F82D66EB3BC632 /* MarkdownFormatter.swift */; };
+		E704B1CE5C1D52327F083020 /* TocParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06BA58EF44826282184BC779 /* TocParser.swift */; };
+		F4E0493C28910410ED60B7CE /* WindowLayoutStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C1B8FCFE3DB1E31F1505EC /* WindowLayoutStore.swift */; };
+		F81EFD1E1DAA75A5783DB21D /* JustMarkCLIProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5FC486DC33B982B12D28262 /* JustMarkCLIProtocol.swift */; };
+		FF90ED7EC0A95241361C3F41 /* WorkspaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B12C58F0816EF7F4EDAAC8C1 /* WorkspaceStore.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		022B8BFED68CC58F47A4AE88 /* PreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewView.swift; sourceTree = "<group>"; };
+		06BA58EF44826282184BC779 /* TocParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TocParser.swift; sourceTree = "<group>"; };
+		1ECE93DB36F82D66EB3BC632 /* MarkdownFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownFormatter.swift; sourceTree = "<group>"; };
+		1FCA2AE866EFBE80E7195497 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
+		2AD031A6438C69A953F2D61C /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		2BF613D0CA3E0B89BF6ED9C7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		2C2A421E136C572900DB623F /* WorkspaceRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceRootView.swift; sourceTree = "<group>"; };
+		3C51CAFF45A1EF9203A95D71 /* JustMark.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JustMark.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		41AF390CD90251B08A97AD8A /* EditorDesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorDesignSystem.swift; sourceTree = "<group>"; };
+		5445398DCA0E8C4C7FA08F69 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
+		62DBEB41EEFC512E018A54DA /* PDFPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFPreviewView.swift; sourceTree = "<group>"; };
+		66EA8FD3A6C3C1AAF508AF8E /* JustMark.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = JustMark.icns; sourceTree = "<group>"; };
+		7273F4640A26598C641D5D6F /* WebDAVService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebDAVService.swift; sourceTree = "<group>"; };
+		7549E7BDA3DB0C2416755766 /* FileSystemService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileSystemService.swift; sourceTree = "<group>"; };
+		988373FC7E3A1DF1C952CB9B /* DocumentTabStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentTabStripView.swift; sourceTree = "<group>"; };
+		99448EA7BBC74B48D2A15716 /* WorkspaceSplitContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSplitContainer.swift; sourceTree = "<group>"; };
+		9B0CA6D7942D13B3B7E3EC9C /* PreviewEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewEngine.swift; sourceTree = "<group>"; };
+		9C11AB53C093A228CD00FAA5 /* RecentHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentHistoryStore.swift; sourceTree = "<group>"; };
+		A5FC486DC33B982B12D28262 /* JustMarkCLIProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JustMarkCLIProtocol.swift; sourceTree = "<group>"; };
+		B12C58F0816EF7F4EDAAC8C1 /* WorkspaceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStore.swift; sourceTree = "<group>"; };
+		B81B17AFC46AE740A80FED81 /* AppModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModels.swift; sourceTree = "<group>"; };
+		C08CDA444DDCACF7706E6B42 /* WindowChromeConfigurator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowChromeConfigurator.swift; sourceTree = "<group>"; };
+		CBF06DE10E016B9BA4801C19 /* WindowService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowService.swift; sourceTree = "<group>"; };
+		CF076CE22D94A406F54C5792 /* AppCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCommands.swift; sourceTree = "<group>"; };
+		D03808650683DA3D3A59AC0A /* JustMarkNativeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JustMarkNativeApp.swift; sourceTree = "<group>"; };
+		DA7ABA69934AA178829226C0 /* ExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportService.swift; sourceTree = "<group>"; };
+		DBC4C27424D98C2A8019D092 /* DocumentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentStore.swift; sourceTree = "<group>"; };
+		E23C078DF0ABE11BB0D063CD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		E289262427E1812E88074F9C /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
+		F4C1B8FCFE3DB1E31F1505EC /* WindowLayoutStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowLayoutStore.swift; sourceTree = "<group>"; };
+		F580817CF077896FFC12DC7F /* SettingsStores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStores.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		35792A571F1EDF426B84317F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				52A8D2010D50814641DCDB23 /* Down in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		030B709519A0503CA0D1A605 = {
+			isa = PBXGroup;
+			children = (
+				F3BC84FC02DDE183364CF563 /* Resources */,
+				213ABD6674A48CFF17E00160 /* Sources */,
+				A159171D9894F454E2C0A088 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		213ABD6674A48CFF17E00160 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				946D20D1FF7E4FFB9D78067E /* App */,
+				EEC0A44C9A464D03699F5446 /* Core */,
+				AF16B03970C489A0474DF607 /* Editor */,
+				D1397AFA6EEFF1FD76304AE2 /* Preview */,
+				DC7677A0A58DE4DF136A0F33 /* SystemIntegration */,
+				3F0E5D57F2E48D1CBF067FDC /* Utils */,
+				456DDE268728F7BE03F6A99D /* WebDAV */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		3F0E5D57F2E48D1CBF067FDC /* Utils */ = {
+			isa = PBXGroup;
+			children = (
+				B81B17AFC46AE740A80FED81 /* AppModels.swift */,
+				F580817CF077896FFC12DC7F /* SettingsStores.swift */,
+				06BA58EF44826282184BC779 /* TocParser.swift */,
+			);
+			path = Utils;
+			sourceTree = "<group>";
+		};
+		456DDE268728F7BE03F6A99D /* WebDAV */ = {
+			isa = PBXGroup;
+			children = (
+				7273F4640A26598C641D5D6F /* WebDAVService.swift */,
+			);
+			path = WebDAV;
+			sourceTree = "<group>";
+		};
+		946D20D1FF7E4FFB9D78067E /* App */ = {
+			isa = PBXGroup;
+			children = (
+				CF076CE22D94A406F54C5792 /* AppCommands.swift */,
+				1FCA2AE866EFBE80E7195497 /* AppEnvironment.swift */,
+				41AF390CD90251B08A97AD8A /* EditorDesignSystem.swift */,
+				D03808650683DA3D3A59AC0A /* JustMarkNativeApp.swift */,
+				E289262427E1812E88074F9C /* SettingsRootView.swift */,
+				C08CDA444DDCACF7706E6B42 /* WindowChromeConfigurator.swift */,
+				2C2A421E136C572900DB623F /* WorkspaceRootView.swift */,
+				99448EA7BBC74B48D2A15716 /* WorkspaceSplitContainer.swift */,
+				B12C58F0816EF7F4EDAAC8C1 /* WorkspaceStore.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A159171D9894F454E2C0A088 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				3C51CAFF45A1EF9203A95D71 /* JustMark.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AF16B03970C489A0474DF607 /* Editor */ = {
+			isa = PBXGroup;
+			children = (
+				DBC4C27424D98C2A8019D092 /* DocumentStore.swift */,
+				988373FC7E3A1DF1C952CB9B /* DocumentTabStripView.swift */,
+				5445398DCA0E8C4C7FA08F69 /* EditorView.swift */,
+				1ECE93DB36F82D66EB3BC632 /* MarkdownFormatter.swift */,
+			);
+			path = Editor;
+			sourceTree = "<group>";
+		};
+		D1397AFA6EEFF1FD76304AE2 /* Preview */ = {
+			isa = PBXGroup;
+			children = (
+				62DBEB41EEFC512E018A54DA /* PDFPreviewView.swift */,
+				9B0CA6D7942D13B3B7E3EC9C /* PreviewEngine.swift */,
+				022B8BFED68CC58F47A4AE88 /* PreviewView.swift */,
+			);
+			path = Preview;
+			sourceTree = "<group>";
+		};
+		DC7677A0A58DE4DF136A0F33 /* SystemIntegration */ = {
+			isa = PBXGroup;
+			children = (
+				DA7ABA69934AA178829226C0 /* ExportService.swift */,
+				7549E7BDA3DB0C2416755766 /* FileSystemService.swift */,
+				2AD031A6438C69A953F2D61C /* KeychainStore.swift */,
+				9C11AB53C093A228CD00FAA5 /* RecentHistoryStore.swift */,
+				F4C1B8FCFE3DB1E31F1505EC /* WindowLayoutStore.swift */,
+				CBF06DE10E016B9BA4801C19 /* WindowService.swift */,
+			);
+			path = SystemIntegration;
+			sourceTree = "<group>";
+		};
+		EEC0A44C9A464D03699F5446 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				A5FC486DC33B982B12D28262 /* JustMarkCLIProtocol.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		F3BC84FC02DDE183364CF563 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				E23C078DF0ABE11BB0D063CD /* Assets.xcassets */,
+				2BF613D0CA3E0B89BF6ED9C7 /* Info.plist */,
+				66EA8FD3A6C3C1AAF508AF8E /* JustMark.icns */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AA3EE33652C8ECE8201DD191 /* JustMark */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C354ADE3D0E09BC78522A5BC /* Build configuration list for PBXNativeTarget "JustMark" */;
+			buildPhases = (
+				15DBF2958AFA7B508CE81D14 /* Sources */,
+				87B6EB50E59DA031A43FFFDD /* Resources */,
+				35792A571F1EDF426B84317F /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = JustMark;
+			packageProductDependencies = (
+				BD7FE3F570F2CEC2AF5660F0 /* Down */,
+			);
+			productName = JustMark;
+			productReference = 3C51CAFF45A1EF9203A95D71 /* JustMark.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0EA9CA2AA308DEEA37299B2F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					AA3EE33652C8ECE8201DD191 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 7B92689CF36472E1B2F6A724 /* Build configuration list for PBXProject "JustMark" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 030B709519A0503CA0D1A605;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				9D4F06F7B970E3C624F200C7 /* XCRemoteSwiftPackageReference "Down-gfm" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A159171D9894F454E2C0A088 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AA3EE33652C8ECE8201DD191 /* JustMark */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		87B6EB50E59DA031A43FFFDD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				33F11444BA76CB6FA0B9A9AE /* Assets.xcassets in Resources */,
+				804F37E25C56DF0FE380476A /* JustMark.icns in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		15DBF2958AFA7B508CE81D14 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7FC11C45AFC294DF9A9B3E52 /* AppCommands.swift in Sources */,
+				5439DEF0FF19354969D1348F /* AppEnvironment.swift in Sources */,
+				17F93229DC4B6C4E82262874 /* AppModels.swift in Sources */,
+				16CECDA91E0F96FFF71E9BBB /* DocumentStore.swift in Sources */,
+				3FD2F5F24DC97977A55D00D9 /* DocumentTabStripView.swift in Sources */,
+				61C1DB77AEE3BDD9AF285FED /* EditorDesignSystem.swift in Sources */,
+				38CF506F8F7160D0CDABEE15 /* EditorView.swift in Sources */,
+				03BBF5EAA129C3D87B7E2976 /* ExportService.swift in Sources */,
+				458B434F2AE80A547A5C4701 /* FileSystemService.swift in Sources */,
+				F81EFD1E1DAA75A5783DB21D /* JustMarkCLIProtocol.swift in Sources */,
+				35DEC9C90FF9B73641140A61 /* JustMarkNativeApp.swift in Sources */,
+				8254AB2B26170E3F100179E1 /* KeychainStore.swift in Sources */,
+				A720239FB6ED31E6E34C652F /* MarkdownFormatter.swift in Sources */,
+				86582E0DCE4D8AD56C91F0D9 /* PDFPreviewView.swift in Sources */,
+				9D63C49A0883362753FBE76A /* PreviewEngine.swift in Sources */,
+				88BC26F78095BDDA2001CCDB /* PreviewView.swift in Sources */,
+				94D91B56621A012E0A78C85E /* RecentHistoryStore.swift in Sources */,
+				114C9AD36EE5469482C75855 /* SettingsRootView.swift in Sources */,
+				A2AC9B98D667992755B62BBB /* SettingsStores.swift in Sources */,
+				E704B1CE5C1D52327F083020 /* TocParser.swift in Sources */,
+				48A0B034D3F98278B26E9C00 /* WebDAVService.swift in Sources */,
+				90D7017B04A355AE92DEE6B4 /* WindowChromeConfigurator.swift in Sources */,
+				F4E0493C28910410ED60B7CE /* WindowLayoutStore.swift in Sources */,
+				131B92C97E37B3BEB473475C /* WindowService.swift in Sources */,
+				851A59FC9360F10E3ADF9E49 /* WorkspaceRootView.swift in Sources */,
+				76B3CE0FE98533B16946FC1F /* WorkspaceSplitContainer.swift in Sources */,
+				FF90ED7EC0A95241361C3F41 /* WorkspaceStore.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		25883BA7261627542339D2DC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = JustMark.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_MODULE_NAME = JustMark;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Debug;
+		};
+		5528C4E18A1F33C82B910C24 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_KEY_CFBundleDisplayName = JustMark;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.justmark.mac;
+				PRODUCT_NAME = JustMark;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.10;
+			};
+			name = Debug;
+		};
+		AE1814EB22511BEC87E2C372 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_KEY_CFBundleDisplayName = JustMark;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.justmark.mac;
+				PRODUCT_NAME = JustMark;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.10;
+			};
+			name = Release;
+		};
+		B6D8E3A6CA17F856ED602A96 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_MODULE_NAME = JustMark;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		7B92689CF36472E1B2F6A724 /* Build configuration list for PBXProject "JustMark" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5528C4E18A1F33C82B910C24 /* Debug */,
+				AE1814EB22511BEC87E2C372 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C354ADE3D0E09BC78522A5BC /* Build configuration list for PBXNativeTarget "JustMark" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				25883BA7261627542339D2DC /* Debug */,
+				B6D8E3A6CA17F856ED602A96 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		9D4F06F7B970E3C624F200C7 /* XCRemoteSwiftPackageReference "Down-gfm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stackotter/Down-gfm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.12.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BD7FE3F570F2CEC2AF5660F0 /* Down */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9D4F06F7B970E3C624F200C7 /* XCRemoteSwiftPackageReference "Down-gfm" */;
+			productName = Down;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 0EA9CA2AA308DEEA37299B2F /* Project object */;
+}

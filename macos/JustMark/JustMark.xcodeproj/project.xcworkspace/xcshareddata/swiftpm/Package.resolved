@@ -1,0 +1,15 @@
+{
+  "originHash" : "39f5b59958705ecfca6b100f128cfbb91edb2dab4a595725e4678c0627344a2a",
+  "pins" : [
+    {
+      "identity" : "down-gfm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/stackotter/Down-gfm",
+      "state" : {
+        "revision" : "0fc19f24ea5ae4ae803c7cdc186b9b02f1b5661b",
+        "version" : "0.12.0"
+      }
+    }
+  ],
+  "version" : 3
+}
