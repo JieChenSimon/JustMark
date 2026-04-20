@@ -146,6 +146,31 @@ enum ContentAppearanceMode: String, CaseIterable, Codable, Identifiable {
     }
 }
 
+enum ContentSurfaceTint: String, CaseIterable, Codable, Identifiable {
+    case defaultTone
+    case warm
+    case cream
+    case cool
+    case graphite
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .defaultTone:
+            return "Default"
+        case .warm:
+            return "Warm"
+        case .cream:
+            return "Cream"
+        case .cool:
+            return "Cool"
+        case .graphite:
+            return "Graphite"
+        }
+    }
+}
+
 struct PreviewRequest: Equatable {
     let documentID: UUID?
     let markdown: String

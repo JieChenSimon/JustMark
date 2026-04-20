@@ -273,6 +273,12 @@ final class ThemeStore: ObservableObject {
     @AppStorage("jm.previewContentAppearance") private var previewContentAppearanceRaw: String = ContentAppearanceMode.followApp.rawValue {
         willSet { objectWillChange.send() }
     }
+    @AppStorage("jm.editorContentSurfaceTint") private var editorContentSurfaceTintRaw: String = ContentSurfaceTint.defaultTone.rawValue {
+        willSet { objectWillChange.send() }
+    }
+    @AppStorage("jm.previewContentSurfaceTint") private var previewContentSurfaceTintRaw: String = ContentSurfaceTint.defaultTone.rawValue {
+        willSet { objectWillChange.send() }
+    }
     @AppStorage("jm.lightWorkspaceBackgroundHex") var lightWorkspaceBackgroundHex: String = "#FFFFFF" {
         willSet { objectWillChange.send() }
     }
@@ -350,6 +356,16 @@ final class ThemeStore: ObservableObject {
         set { previewContentAppearanceRaw = newValue.rawValue }
     }
 
+    var editorContentSurfaceTint: ContentSurfaceTint {
+        get { ContentSurfaceTint(rawValue: editorContentSurfaceTintRaw) ?? .defaultTone }
+        set { editorContentSurfaceTintRaw = newValue.rawValue }
+    }
+
+    var previewContentSurfaceTint: ContentSurfaceTint {
+        get { ContentSurfaceTint(rawValue: previewContentSurfaceTintRaw) ?? .defaultTone }
+        set { previewContentSurfaceTintRaw = newValue.rawValue }
+    }
+
     var effectiveEditorIsDark: Bool {
         resolvedContentIsDark(editorContentAppearance)
     }
@@ -367,14 +383,19 @@ final class ThemeStore: ObservableObject {
     }
 
     var previewBackgroundNSColor: NSColor {
-        if effectivePreviewIsDark {
-            return NSColor(hex: "#1E1E21") ?? workspaceBackgroundNSColor
-        }
-        return NSColor(hex: "#F9F7F2") ?? workspaceBackgroundNSColor
+        surfaceTintColor(
+            previewContentSurfaceTint,
+            isDark: effectivePreviewIsDark,
+            role: .preview
+        )
     }
 
     var previewBackgroundColor: Color {
         Color(nsColor: previewBackgroundNSColor)
+    }
+
+    var previewPageBackgroundHex: String {
+        previewBackgroundNSColor.hexString()
     }
 
     var sidebarBackgroundNSColor: NSColor {
@@ -399,10 +420,11 @@ final class ThemeStore: ObservableObject {
     }
 
     var editorCanvasBackgroundNSColor: NSColor {
-        if effectiveEditorIsDark {
-            return NSColor(hex: "#1C1C1F") ?? workspaceBackgroundNSColor
-        }
-        return NSColor(hex: "#FCFBF8") ?? workspaceBackgroundNSColor
+        surfaceTintColor(
+            editorContentSurfaceTint,
+            isDark: effectiveEditorIsDark,
+            role: .editor
+        )
     }
 
     var editorChromeBackgroundColor: Color {
@@ -486,6 +508,57 @@ final class ThemeStore: ObservableObject {
         case .dark:
             return true
         }
+    }
+
+    private enum SurfaceRole {
+        case editor
+        case preview
+    }
+
+    private func surfaceTintColor(_ tint: ContentSurfaceTint, isDark: Bool, role: SurfaceRole) -> NSColor {
+        let hex: String
+        switch (tint, isDark, role) {
+        case (.defaultTone, false, .editor):
+            hex = "#FCFBF8"
+        case (.defaultTone, false, .preview):
+            hex = "#F9F7F2"
+        case (.defaultTone, true, .editor):
+            hex = "#1C1C1F"
+        case (.defaultTone, true, .preview):
+            hex = "#1E1E21"
+
+        case (.warm, false, .editor):
+            hex = "#FAF5EC"
+        case (.warm, false, .preview):
+            hex = "#F6F0E5"
+        case (.warm, true, _):
+            hex = "#221E1A"
+
+        case (.cream, false, .editor):
+            hex = "#FFFDF7"
+        case (.cream, false, .preview):
+            hex = "#FCF8EF"
+        case (.cream, true, _):
+            hex = "#25221D"
+
+        case (.cool, false, .editor):
+            hex = "#F6FAFC"
+        case (.cool, false, .preview):
+            hex = "#F1F6FA"
+        case (.cool, true, _):
+            hex = "#1A2026"
+
+        case (.graphite, false, .editor):
+            hex = "#F2F1EE"
+        case (.graphite, false, .preview):
+            hex = "#ECEAE5"
+        case (.graphite, true, .editor):
+            hex = "#17191D"
+        case (.graphite, true, .preview):
+            hex = "#191B20"
+        }
+
+        return NSColor(hex: hex) ?? workspaceBackgroundNSColor
     }
 
     func editorNSFont() -> NSFont {

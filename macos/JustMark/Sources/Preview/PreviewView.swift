@@ -11,6 +11,7 @@ struct PreviewView: NSViewRepresentable, Equatable {
     let fontFamilyCSS: String
     let isDark: Bool
     let backgroundColor: NSColor
+    let pageBackgroundHex: String
     let onOpenLink: (URL) -> Void
 
     static func == (lhs: PreviewView, rhs: PreviewView) -> Bool {
@@ -20,7 +21,8 @@ struct PreviewView: NSViewRepresentable, Equatable {
         lhs.fontSize == rhs.fontSize &&
         lhs.fontFamilyCSS == rhs.fontFamilyCSS &&
         lhs.isDark == rhs.isDark &&
-        lhs.backgroundColor == rhs.backgroundColor
+        lhs.backgroundColor == rhs.backgroundColor &&
+        lhs.pageBackgroundHex == rhs.pageBackgroundHex
     }
 
     func makeNSView(context: Context) -> PreviewSurfaceView {
@@ -34,8 +36,14 @@ struct PreviewView: NSViewRepresentable, Equatable {
         context.coordinator.onOpenLink = onOpenLink
         nsView.onOpenLink = onOpenLink
         nsView.setAppearance(isDark: isDark, backgroundColor: backgroundColor)
-        nsView.setTheme(isDark: isDark)
-        nsView.load(renderedHTML: renderedHTML, baseURL: baseURL, fontSize: fontSize, fontFamilyCSS: fontFamilyCSS)
+        nsView.setTheme(isDark: isDark, pageBackgroundHex: pageBackgroundHex)
+        nsView.load(
+            renderedHTML: renderedHTML,
+            baseURL: baseURL,
+            fontSize: fontSize,
+            fontFamilyCSS: fontFamilyCSS,
+            pageBackgroundHex: pageBackgroundHex
+        )
     }
 
     func makeCoordinator() -> Coordinator {
@@ -72,6 +80,8 @@ final class PreviewSurfaceView: NSView {
     private var lastIsDark: Bool?
     private var lastThemeIsDark: Bool?
     private var pendingThemeIsDark: Bool?
+    private var lastPageBackgroundHex: String?
+    private var pendingPageBackgroundHex: String?
     private var shouldSkipPostNavigationBootstrap = false
     private var initialLoadInFlight = false
     private var initialLoadedSignature: UInt64?
@@ -79,6 +89,7 @@ final class PreviewSurfaceView: NSView {
     private var initialLoadedFontSize: Double?
     private var initialLoadedFontFamilyCSS: String?
     private var initialLoadedThemeIsDark: Bool?
+    private var initialLoadedPageBackgroundHex: String?
     var onOpenLink: (URL) -> Void = { _ in }
 
     init(linkMessageHandler: WKScriptMessageHandler, frame frameRect: NSRect = .zero) {
@@ -131,15 +142,17 @@ final class PreviewSurfaceView: NSView {
         window?.preservesContentDuringLiveResize = true
     }
 
-    func load(renderedHTML: String, baseURL: URL?, fontSize: Double, fontFamilyCSS: String) {
+    func load(renderedHTML: String, baseURL: URL?, fontSize: Double, fontFamilyCSS: String, pageBackgroundHex: String) {
         let renderSignature = htmlSignature(for: renderedHTML)
-        guard renderSignature != lastRenderedSignature || baseURL != lastBaseURL || fontSize != lastFontSize || fontFamilyCSS != lastFontFamilyCSS else { return }
+        guard renderSignature != lastRenderedSignature || baseURL != lastBaseURL || fontSize != lastFontSize || fontFamilyCSS != lastFontFamilyCSS || pageBackgroundHex != lastPageBackgroundHex else { return }
         let baseURLChanged = baseURL != lastBaseURL
         lastRenderedSignature = renderSignature
         lastBaseURL = baseURL
         lastFontSize = fontSize
         lastFontFamilyCSS = fontFamilyCSS
+        lastPageBackgroundHex = pageBackgroundHex
         pendingBodyHTML = renderedHTML
+        pendingPageBackgroundHex = pageBackgroundHex
 
         if !didFinishInitialLoad {
             pendingBaseURL = baseURL
@@ -155,6 +168,7 @@ final class PreviewSurfaceView: NSView {
             initialLoadedFontSize = fontSize
             initialLoadedFontFamilyCSS = fontFamilyCSS
             initialLoadedThemeIsDark = initialThemeIsDark
+            initialLoadedPageBackgroundHex = pageBackgroundHex
             shouldSkipPostNavigationBootstrap = true
             webView.loadHTMLString(
                 documentHTML(
@@ -162,7 +176,8 @@ final class PreviewSurfaceView: NSView {
                     baseURL: baseURL,
                     fontSize: fontSize,
                     fontFamilyCSS: fontFamilyCSS,
-                    isDark: initialThemeIsDark
+                    isDark: initialThemeIsDark,
+                    pageBackgroundHex: pageBackgroundHex
                 ),
                 baseURL: baseURL
             )
@@ -172,7 +187,13 @@ final class PreviewSurfaceView: NSView {
         if baseURLChanged {
             updateBaseURL(baseURL)
         }
-        updateBodyHTML(renderedHTML, baseURL: baseURL, fontSize: fontSize, fontFamilyCSS: fontFamilyCSS)
+        updateBodyHTML(
+            renderedHTML,
+            baseURL: baseURL,
+            fontSize: fontSize,
+            fontFamilyCSS: fontFamilyCSS,
+            pageBackgroundHex: pageBackgroundHex
+        )
     }
 
     func setAppearance(isDark: Bool, backgroundColor: NSColor) {
@@ -187,25 +208,26 @@ final class PreviewSurfaceView: NSView {
         webView.underPageBackgroundColor = backgroundColor
     }
 
-    func setTheme(isDark: Bool) {
+    func setTheme(isDark: Bool, pageBackgroundHex: String) {
         pendingThemeIsDark = isDark
+        pendingPageBackgroundHex = pageBackgroundHex
         guard didFinishInitialLoad else { return }
-        applyTheme(isDark: isDark)
+        applyTheme(isDark: isDark, pageBackgroundHex: pageBackgroundHex)
     }
 
-    private func applyTheme(isDark: Bool) {
-        guard lastThemeIsDark != isDark else { return }
+    private func applyTheme(isDark: Bool, pageBackgroundHex: String) {
+        guard lastThemeIsDark != isDark || lastPageBackgroundHex != pageBackgroundHex else { return }
         lastThemeIsDark = isDark
-        let arguments: [String: Any] = ["isDark": isDark]
+        let arguments: [String: Any] = ["isDark": isDark, "pageBackgroundHex": pageBackgroundHex]
         webView.callAsyncJavaScript(
-            "window.__justmarkSetTheme(isDark);",
+            "window.__justmarkSetTheme(isDark, pageBackgroundHex);",
             arguments: arguments,
             in: nil,
             in: .page
         ) { _ in }
     }
 
-    private func documentHTML(bodyHTML: String, baseURL: URL?, fontSize: Double, fontFamilyCSS: String, isDark: Bool) -> String {
+    private func documentHTML(bodyHTML: String, baseURL: URL?, fontSize: Double, fontFamilyCSS: String, isDark: Bool, pageBackgroundHex: String) -> String {
         let resolvedBodyHTML = rewriteLocalImageSources(in: bodyHTML, baseURL: baseURL)
         let style = """
         <style>
@@ -217,7 +239,7 @@ final class PreviewSurfaceView: NSView {
           --jm-code: rgba(175, 184, 193, 0.14);
           --jm-accent: #0a84ff;
           --jm-surface: rgba(255,255,255,0.88);
-          --jm-page: #fcfcfd;
+          --jm-page: \(pageBackgroundHex);
         }
         html, body {
           margin: 0;
@@ -323,7 +345,7 @@ final class PreviewSurfaceView: NSView {
           --jm-border: rgba(255, 255, 255, 0.10);
           --jm-code: rgba(255, 255, 255, 0.06);
           --jm-accent: #7cb7ff;
-          --jm-page: #1f2125;
+          --jm-page: \(pageBackgroundHex);
         }
         :root[data-theme="dark"] body {
           color: var(--jm-text);
@@ -337,7 +359,7 @@ final class PreviewSurfaceView: NSView {
         }
         </style>
         <script>
-        window.__justmarkUpdate = function(html, fontSize, fontFamily) {
+        window.__justmarkUpdate = function(html, fontSize, fontFamily, pageBackgroundHex) {
           const root = document.getElementById('jm-preview-root');
           if (root) {
             root.innerHTML = html;
@@ -347,9 +369,11 @@ final class PreviewSurfaceView: NSView {
           }
           document.body.style.fontSize = fontSize + 'px';
           document.body.style.fontFamily = fontFamily;
+          document.documentElement.style.setProperty('--jm-page', pageBackgroundHex);
         };
-        window.__justmarkSetTheme = function(isDark) {
+        window.__justmarkSetTheme = function(isDark, pageBackgroundHex) {
           document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+          document.documentElement.style.setProperty('--jm-page', pageBackgroundHex);
         };
         window.__justmarkSetBase = function(href) {
           const baseTag = document.getElementById('jm-base');
@@ -402,16 +426,17 @@ final class PreviewSurfaceView: NSView {
         """
     }
 
-    private func updateBodyHTML(_ bodyHTML: String, baseURL: URL?, fontSize: Double, fontFamilyCSS: String) {
+    private func updateBodyHTML(_ bodyHTML: String, baseURL: URL?, fontSize: Double, fontFamilyCSS: String, pageBackgroundHex: String) {
         let resolvedBodyHTML = rewriteLocalImageSources(in: bodyHTML, baseURL: baseURL)
         let arguments: [String: Any] = [
             "html": resolvedBodyHTML,
             "fontSize": Int(fontSize),
-            "fontFamily": fontFamilyCSS
+            "fontFamily": fontFamilyCSS,
+            "pageBackgroundHex": pageBackgroundHex
         ]
 
         webView.callAsyncJavaScript(
-            "window.__justmarkUpdate(html, fontSize, fontFamily);",
+            "window.__justmarkUpdate(html, fontSize, fontFamily, pageBackgroundHex);",
             arguments: arguments,
             in: nil,
             in: .page
@@ -619,14 +644,23 @@ extension PreviewSurfaceView: WKNavigationDelegate {
             if let pendingBodyHTML,
                let lastFontSize,
                let lastFontFamilyCSS,
+               let pendingPageBackgroundHex,
                htmlSignature(for: pendingBodyHTML) != initialLoadedSignature ||
                 lastFontSize != initialLoadedFontSize ||
-                lastFontFamilyCSS != initialLoadedFontFamilyCSS {
-                updateBodyHTML(pendingBodyHTML, baseURL: pendingBaseURL, fontSize: lastFontSize, fontFamilyCSS: lastFontFamilyCSS)
+                lastFontFamilyCSS != initialLoadedFontFamilyCSS ||
+                pendingPageBackgroundHex != initialLoadedPageBackgroundHex {
+                updateBodyHTML(
+                    pendingBodyHTML,
+                    baseURL: pendingBaseURL,
+                    fontSize: lastFontSize,
+                    fontFamilyCSS: lastFontFamilyCSS,
+                    pageBackgroundHex: pendingPageBackgroundHex
+                )
             }
             if let pendingThemeIsDark,
+               let pendingPageBackgroundHex,
                pendingThemeIsDark != initialLoadedThemeIsDark {
-                applyTheme(isDark: pendingThemeIsDark)
+                applyTheme(isDark: pendingThemeIsDark, pageBackgroundHex: pendingPageBackgroundHex)
             }
 
             return
@@ -635,15 +669,22 @@ extension PreviewSurfaceView: WKNavigationDelegate {
         guard
             let pendingBodyHTML,
             let lastFontSize,
-            let lastFontFamilyCSS
+            let lastFontFamilyCSS,
+            let pendingPageBackgroundHex
         else {
             return
         }
 
         updateBaseURL(pendingBaseURL ?? lastBaseURL)
-        updateBodyHTML(pendingBodyHTML, baseURL: pendingBaseURL ?? lastBaseURL, fontSize: lastFontSize, fontFamilyCSS: lastFontFamilyCSS)
+        updateBodyHTML(
+            pendingBodyHTML,
+            baseURL: pendingBaseURL ?? lastBaseURL,
+            fontSize: lastFontSize,
+            fontFamilyCSS: lastFontFamilyCSS,
+            pageBackgroundHex: pendingPageBackgroundHex
+        )
         if let pendingThemeIsDark {
-            applyTheme(isDark: pendingThemeIsDark)
+            applyTheme(isDark: pendingThemeIsDark, pageBackgroundHex: pendingPageBackgroundHex)
         }
     }
 }

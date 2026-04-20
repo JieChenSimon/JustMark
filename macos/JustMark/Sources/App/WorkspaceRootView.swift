@@ -987,6 +987,7 @@ private struct PreviewPaneView: View, Equatable {
                             fontFamilyCSS: previewFontFamilyCSS,
                             isDark: isDark,
                             backgroundColor: backgroundColor,
+                            pageBackgroundHex: backgroundColor.hexString(),
                             onOpenLink: onOpenLink
                         )
                         .equatable()

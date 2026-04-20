@@ -166,6 +166,16 @@ private struct AppearanceSettingsPane: View {
                 }
                 .pickerStyle(.menu)
 
+                Picker("Editor Background", selection: Binding(
+                    get: { themeStore.editorContentSurfaceTint },
+                    set: { themeStore.editorContentSurfaceTint = $0 }
+                )) {
+                    ForEach(ContentSurfaceTint.allCases) { tint in
+                        Text(tint.title).tag(tint)
+                    }
+                }
+                .pickerStyle(.menu)
+
                 Picker("Preview Surface", selection: Binding(
                     get: { themeStore.previewContentAppearance },
                     set: { themeStore.previewContentAppearance = $0 }
@@ -175,10 +185,20 @@ private struct AppearanceSettingsPane: View {
                     }
                 }
                 .pickerStyle(.menu)
+
+                Picker("Preview Background", selection: Binding(
+                    get: { themeStore.previewContentSurfaceTint },
+                    set: { themeStore.previewContentSurfaceTint = $0 }
+                )) {
+                    ForEach(ContentSurfaceTint.allCases) { tint in
+                        Text(tint.title).tag(tint)
+                    }
+                }
+                .pickerStyle(.menu)
             } header: {
                 Text("Content Surfaces")
             } footer: {
-                Text("Keep the window chrome on the app theme, and override only the editor or preview content when you need a different reading surface.")
+                Text("Keep the window chrome on the app theme. Use surface mode to control light or dark behavior, and use background presets to pick a paper or canvas tone without introducing arbitrary colors.")
             }
 
             Section {
