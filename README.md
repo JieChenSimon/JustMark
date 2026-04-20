@@ -2,46 +2,127 @@
 
 **The Zen of Writing.** **回归写作本质的极简编辑器。**
 
-JustMark is not just a Markdown editor; it is a space designed for focus. We stripped away complex toolbars and heavy dependencies to bring you a writing tool that feels as light as air.
+JustMark is a native macOS Markdown editor built for focused writing. The current mainline is based on `SwiftUI + AppKit + WKWebView`, with a stable three-pane workspace, native text editing, and a calmer interface than typical web-wrapped editors.
 
-JustMark 不仅仅是一个编辑器，它是一个专为专注而生的空间。我们摒弃了复杂的菜单和沉重的依赖，只为你提供如空气般轻盈的写作体验。
+JustMark 是一个面向专注写作的原生 macOS Markdown 编辑器。当前主线实现基于 `SwiftUI + AppKit + WKWebView`，重点放在稳定的三栏工作区、原生文本编辑体验，以及更克制、更安静的界面。
 
 ## 🌟 Why JustMark? / 核心优势
 
-### 🪶 Ultra Lightweight / 极致轻量
+### 🪶 Native & Lightweight / 原生且轻量
 
-Forget about 100MB+ Electron apps. Built on next-gen native technology, JustMark is incredibly small (**<10MB**) and launches instantly. It respects your computer's memory and battery.
-告别臃肿的传统编辑器。基于下一代原生技术构建，JustMark 体积微小（**小于 10MB**），秒级启动。它极度节省你的内存和电量。
+Forget about heavy browser shells. JustMark now ships as a native macOS app with fast launch, lower memory overhead, and desktop behaviors that fit the platform.
+告别厚重的浏览器壳层。JustMark 现在是一套真正的原生 macOS 应用，启动更快、内存占用更低，也更贴近桌面平台应有的行为。
 
-### 🍎 Extreme Minimalism / 极简美学
+### 🍎 Focused Workspace / 专注型三栏工作区
 
-* **Borderless Design**: An immersive window that blends into your desktop.
-* **Intuitive Drag**: Drag anywhere on the header to move the window.
-* **Zero Clutter**: No complex menus. Just you and your words.
-* **无边框设计**：沉浸式窗口，完美融合 macOS 桌面美学。
-* **全域拖拽**：顶部栏任意位置均可拖动，手感顺滑。
-* **零干扰**：没有复杂的菜单栏，只有你和文字。
+* **Sidebar + Editor + Preview**: A stable three-pane layout for folder navigation, writing, and reading.
+* **Multi-tab Editing**: Work across multiple Markdown files without leaving the current workspace.
+* **Native Text Engine**: The editor is powered by `NSTextView`, which makes macOS text input and keyboard behavior more reliable.
+* **三栏布局**：目录、编辑、预览同屏协作，适合持续写作与整理文档。
+* **多标签编辑**：可以在一个工作区内切换多个文档。
+* **原生编辑内核**：编辑区基于 `NSTextView`，更适合 macOS 的输入和快捷键习惯。
 
-### 📄 What You See Is What You Get / 真实纸张预览
+### 📄 Better Markdown Preview / 更可靠的 Markdown 预览
 
-The right panel perfectly simulates **A4 paper size**. No more guessing page breaks. When you click "Export", you get exactly what you see.
-右侧预览区严格对应 **A4 纸张尺寸**。无需猜测排版，无需调整页边距。当你点击“导出”时，得到的 PDF 与你看到的分毫不差。
+GitHub-style Markdown rendering is now a first-class goal. Common README patterns such as tables, images, links, HTML blocks, and mixed content render much more reliably than before.
+GitHub 风格 Markdown 渲染已经成为当前重点。常见 README 场景里的表格、图片、链接、HTML block 和混合内容，现在都比之前稳定得多。
 
-### 🌗 Day & Night / 昼夜陪伴
+### 🌗 Theme, Fonts, and Reading Comfort / 主题、字体与阅读舒适度
 
-Native Dark Mode support. Whether you are writing in a sunlit cafe or a dim room, JustMark adapts to your eyes instantly.
-原生暗夜模式支持。无论是在阳光充足的咖啡馆，还是深夜的房间，一键切换，时刻护眼。
+* **App Theme**: Light and dark mode support.
+* **Independent Content Surfaces**: Editor and preview can each follow the app theme, or be forced to light/dark independently.
+* **Separate Chinese / Latin Fonts**: Configure CJK and Latin fonts independently for editing and preview.
+* **全局主题**：支持浅色与深色模式。
+* **内容区独立外观**：编辑区和预览区可以跟随应用主题，也可以分别单独设为浅色或深色。
+* **中英文字体分离配置**：编辑区和预览区都支持分别设置中文与英文字体。
+
+### ⌨️ Native Workflow / 原生工作流
+
+JustMark supports recent files, recent folders, customizable shortcuts, find/replace, PDF export, and a built-in CLI entry for opening files or rendering output from Terminal.
+JustMark 支持最近文件、最近文件夹、自定义快捷键、查找替换、PDF 导出，以及一个可从终端打开文件或渲染输出的 CLI 入口。
 
 ---
 
+## ✨ What It Can Do / 现在能做什么
+
+- Open a file or an entire folder as a workspace  
+  打开单个 Markdown 文件，或整个文件夹作为工作区
+- Edit multiple documents in tabs  
+  通过标签页编辑多个文档
+- Render GitHub-flavored Markdown in the preview pane  
+  在右侧预览区渲染 GitHub 风格 Markdown
+- Export the current document as PDF  
+  将当前文档导出为 PDF
+- Customize shortcuts, fonts, and content appearance  
+  自定义快捷键、字体和内容区外观
+- Configure WebDAV sync for the current document or Markdown workspace  
+  为当前文档或当前 Markdown 工作区配置 WebDAV 同步
+
 ## 📥 Download / 下载使用
 
-Visit the [Releases Page](../../releases) to download the latest version for macOS.
-请访问 [Releases 页面](../../releases) 下载适用于 macOS 的最新版本。
+Visit the [Releases Page](https://github.com/JieChenSimon/JustMark/releases) to download the latest macOS build.  
+请访问 [Releases 页面](https://github.com/JieChenSimon/JustMark/releases) 下载最新 macOS 安装包。
 
-1. Download the `.dmg` file. (下载 .dmg 文件)
-2. Drag into Applications. (拖入应用程序文件夹)
-3. Start writing. (开始写作)
+1. Download the latest `.dmg` file. (下载最新 `.dmg` 文件)
+2. Drag `JustMark.app` into Applications. (拖入应用程序文件夹)
+3. Launch and start writing. (启动并开始写作)
+
+---
+
+## 🛠 Build From Source / 从源码运行
+
+Project root:
+
+```bash
+cd /Users/SimonChen/workspace/codespace/JustMark/macos/JustMark
+```
+
+Open with Xcode:
+
+```bash
+open /Users/SimonChen/workspace/codespace/JustMark/macos/JustMark/JustMark.xcodeproj
+```
+
+Build from Terminal:
+
+```bash
+xcodebuild \
+  -project /Users/SimonChen/workspace/codespace/JustMark/macos/JustMark/JustMark.xcodeproj \
+  -scheme JustMark \
+  -configuration Debug \
+  build
+```
+
+## 🧰 CLI / 命令行入口
+
+The repository also ships a native CLI named `justmark`.
+仓库里同时包含一个原生命令行入口 `justmark`。
+
+Build it:
+
+```bash
+cd /Users/SimonChen/workspace/codespace/JustMark/macos/JustMark
+swift build --product justmark
+```
+
+Examples:
+
+```bash
+./.build/debug/justmark
+./.build/debug/justmark README.md
+./.build/debug/justmark .
+./.build/debug/justmark new
+./.build/debug/justmark render-html README.md --output /tmp/preview.html
+./.build/debug/justmark render-pdf README.md --output /tmp/preview.pdf
+```
+
+Install to your user `PATH`:
+
+```bash
+cd /Users/SimonChen/workspace/codespace/JustMark/macos/JustMark
+./scripts/install-cli.sh
+justmark version
+```
 
 ---
 
@@ -53,16 +134,26 @@ Visit the [Releases Page](../../releases) to download the latest version for mac
 
 在终端粘贴复制输入命令（注意最后有一个空格）：
 
-```
+```bash
 sudo xattr -r -d com.apple.quarantine 
 ```
 
 先不要按回车！先不要按回车！先不要按回车！先不要按回车！
 
-然后打开 “访达”（Finder）进入 “应用程序” 目录，找到该软件图标，将图标拖到刚才的终端窗口里面，会得到如下组合(如图所示)：
+然后打开 “访达”（Finder）进入 “应用程序” 目录，找到该软件图标，将图标拖到刚才的终端窗口里面，会得到如下组合：
 
-```
+```bash
 sudo xattr -r -d com.apple.quarantine /Applications/JustMark.app
 ```
 
 回到终端窗口按回车，输入系统密码回车即可。
+
+### 2: 这个仓库现在到底是哪条技术路线？
+
+当前主线是 `macos/JustMark` 里的原生 macOS 工程。  
+目前 README、发布包和后续功能更新，都以这套原生实现为准。
+
+### 3: WebDAV 是完整云盘同步吗？
+
+不是。当前更适合“Markdown 文档 / Markdown 工作区同步或备份”场景。  
+它在持续重构中，目标是行为稳定、配置清晰、风险可解释，而不是立即变成通用型云盘客户端。
