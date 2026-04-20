@@ -35,7 +35,7 @@
 构建：
 
 ```bash
-cd /Users/SimonChen/workspace/codespace/JustMark/macos/JustMark
+cd /path/to/JustMark/macos/JustMark
 swift build --product justmark
 ```
 
@@ -53,7 +53,7 @@ swift build --product justmark
 安装到当前用户 PATH：
 
 ```bash
-cd /Users/SimonChen/workspace/codespace/JustMark/macos/JustMark
+cd /path/to/JustMark/macos/JustMark
 ./scripts/install-cli.sh
 justmark version
 ```
@@ -61,7 +61,7 @@ justmark version
 如果本机存在多个同名 `JustMark.app`，可以显式指定原生版 app bundle：
 
 ```bash
-./.build/debug/justmark --app /Users/SimonChen/Library/Developer/Xcode/DerivedData/JustMark-ampzobdmjvdjerhkhmqrgtxxmlcr/Build/Products/Debug/JustMark.app README.md --preview
+./.build/debug/justmark --app /path/to/JustMark.app README.md --preview
 ```
 
 CLI 通过自定义 URL scheme `justmark://` 向 app 投递 `open` / `new` 命令。当前 v1 支持：

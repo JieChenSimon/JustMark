@@ -60,8 +60,8 @@ JustMark 支持最近文件、最近文件夹、自定义快捷键、查找替�
 
 ## 📥 Download / 下载使用
 
-Visit the [Releases Page](https://github.com/JieChenSimon/JustMark/releases) to download the latest macOS build.  
-请访问 [Releases 页面](https://github.com/JieChenSimon/JustMark/releases) 下载最新 macOS 安装包。
+Download the latest macOS build from this repository's GitHub Releases page.  
+请从当前仓库的 GitHub Releases 页面下载最新 macOS 安装包。
 
 1. Download the latest `.dmg` file. (下载最新 `.dmg` 文件)
 2. Drag `JustMark.app` into Applications. (拖入应用程序文件夹)
@@ -74,20 +74,21 @@ Visit the [Releases Page](https://github.com/JieChenSimon/JustMark/releases) to 
 Project root:
 
 ```bash
-cd /Users/SimonChen/workspace/codespace/JustMark/macos/JustMark
+cd macos/JustMark
 ```
 
 Open with Xcode:
 
 ```bash
-open /Users/SimonChen/workspace/codespace/JustMark/macos/JustMark/JustMark.xcodeproj
+open JustMark.xcodeproj
 ```
 
 Build from Terminal:
 
 ```bash
+cd macos/JustMark
 xcodebuild \
-  -project /Users/SimonChen/workspace/codespace/JustMark/macos/JustMark/JustMark.xcodeproj \
+  -project JustMark.xcodeproj \
   -scheme JustMark \
   -configuration Debug \
   build
@@ -101,7 +102,7 @@ The repository also ships a native CLI named `justmark`.
 Build it:
 
 ```bash
-cd /Users/SimonChen/workspace/codespace/JustMark/macos/JustMark
+cd macos/JustMark
 swift build --product justmark
 ```
 
@@ -119,7 +120,7 @@ Examples:
 Install to your user `PATH`:
 
 ```bash
-cd /Users/SimonChen/workspace/codespace/JustMark/macos/JustMark
+cd macos/JustMark
 ./scripts/install-cli.sh
 justmark version
 ```
