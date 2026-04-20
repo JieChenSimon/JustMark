@@ -23,6 +23,9 @@ enum EditorDesignSystem {
     enum Chrome {
         static let windowControlsLeadingClearance: CGFloat = 168
         static let topChromeHeight: CGFloat = 38
+        static let paneContentTopInset: CGFloat = topChromeHeight
+        static let sidebarContentTopInset: CGFloat = 8
+        static let previewContentTopInset: CGFloat = 0
         static let tabStripHeight: CGFloat = 28
         static let tabHeight: CGFloat = 22
         static let tabStripVerticalOffset: CGFloat = 0

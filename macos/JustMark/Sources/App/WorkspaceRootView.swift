@@ -89,12 +89,7 @@ struct WorkspaceTopChromeView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: EditorDesignSystem.Chrome.topChromeHeight)
-        .background(themeStore.editorChromeBackgroundColor)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(themeStore.editorHairlineColor)
-                .frame(height: 1)
-        }
+        .background(Color.clear)
         .overlay(alignment: .trailing) {
             trailingToolbar
                 .padding(.trailing, floatingToolbarTrailingPadding)
@@ -194,15 +189,7 @@ private struct TopChromeButton: View {
 
 private extension WorkspaceRootView {
     var workspaceContent: some View {
-        VStack(spacing: 0) {
-            WorkspaceTopChromeView(
-                sidebarWidth: sidebarWidth,
-                dividerWidth: CGFloat(settingsStore.layoutDividerWidth)
-            )
-            .environmentObject(themeStore)
-            .environmentObject(documentStore)
-            .environmentObject(workspaceStore)
-
+        ZStack(alignment: .top) {
             WorkspaceSplitContainer(
                 sidebar: AnyView(
                     SidebarView()
@@ -253,6 +240,14 @@ private extension WorkspaceRootView {
                 transaction.animation = nil
                 transaction.disablesAnimations = true
             }
+
+            WorkspaceTopChromeView(
+                sidebarWidth: sidebarWidth,
+                dividerWidth: CGFloat(settingsStore.layoutDividerWidth)
+            )
+            .environmentObject(themeStore)
+            .environmentObject(documentStore)
+            .environmentObject(workspaceStore)
         }
     }
 }
@@ -341,7 +336,7 @@ private struct SidebarView: View {
     @EnvironmentObject private var workspaceStore: WorkspaceStore
     @Environment(\.windowService) private var windowService
     private var topInset: CGFloat {
-        CGFloat(settingsStore.layoutSidebarTopInset) * 0.5
+        EditorDesignSystem.Chrome.sidebarContentTopInset
     }
 
     var body: some View {
@@ -429,9 +424,8 @@ private struct SidebarHeader: View {
 }
 
 private struct SidebarEmptyState: View {
-    @EnvironmentObject private var settingsStore: SettingsStore
     private var topInset: CGFloat {
-        CGFloat(settingsStore.layoutSidebarTopInset) * 0.5
+        EditorDesignSystem.Chrome.sidebarContentTopInset
     }
 
     var body: some View {
@@ -904,6 +898,7 @@ private struct EditorContainerView: View {
 
                         Spacer(minLength: EditorDesignSystem.Canvas.outerGutter)
                     }
+                    .padding(.top, EditorDesignSystem.Chrome.paneContentTopInset)
                     .background(themeStore.editorCanvasBackgroundColor)
                 } else {
                     WorkspaceEmptyDocumentView()
@@ -913,7 +908,8 @@ private struct EditorContainerView: View {
             .overlay(alignment: .topTrailing) {
                 if documentStore.findReplaceState.isPresented {
                     FindReplacePanel()
-                        .padding(EditorDesignSystem.Chrome.overlayPadding)
+                        .padding(.top, EditorDesignSystem.Chrome.overlayPadding + EditorDesignSystem.Chrome.paneContentTopInset)
+                        .padding(.trailing, EditorDesignSystem.Chrome.overlayPadding)
                 }
             }
             .overlay(alignment: .bottomLeading) {
@@ -948,7 +944,7 @@ private struct WorkspaceEmptyDocumentView: View {
             }
         }
         .padding(.horizontal, 40)
-        .padding(.top, 36)
+        .padding(.top, 36 + EditorDesignSystem.Chrome.paneContentTopInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(themeStore.workspaceBackgroundColor)
     }
@@ -1032,6 +1028,7 @@ private struct PreviewPaneView: View, Equatable {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
+                .padding(.top, EditorDesignSystem.Chrome.previewContentTopInset)
                 .padding(.horizontal, 0)
             } else {
                 Text("Preview")
