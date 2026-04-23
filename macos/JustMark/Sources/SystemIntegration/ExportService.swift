@@ -13,14 +13,15 @@ public final class ExportService {
     public func renderPDFData(html: String, baseURL: URL?) async throws -> Data {
         let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 794, height: 1123))
         try await loadHTML(html, in: webView, baseURL: baseURL)
+        try await waitForPreviewScripts(in: webView)
         let contentSize = try await measureContentSize(in: webView)
         if contentSize.height > 0 {
             webView.setFrameSize(contentSize)
         }
-        let configuration = WKPDFConfiguration()
-        configuration.rect = webView.bounds
+        let pdfConfiguration = WKPDFConfiguration()
+        pdfConfiguration.rect = webView.bounds
 
-        return try await webView.pdf(configuration: configuration)
+        return try await webView.pdf(configuration: pdfConfiguration)
     }
 
     private func loadHTML(_ html: String, in webView: WKWebView, baseURL: URL?) async throws {
@@ -55,6 +56,15 @@ public final class ExportService {
             return scrollView.contentSize
         }
         return webView.bounds.size
+    }
+
+    private func waitForPreviewScripts(in webView: WKWebView) async throws {
+        _ = try await webView.callAsyncJavaScript(
+            "window.__justmarkWaitForMath ? window.__justmarkWaitForMath() : Promise.resolve(true);",
+            arguments: [:],
+            in: nil,
+            in: .page
+        )
     }
 }
 

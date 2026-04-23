@@ -1,5 +1,6 @@
 import Down
 import Foundation
+import JavaScriptCore
 
 public final class PreviewEngine: @unchecked Sendable {
     public init() {}
@@ -103,9 +104,26 @@ public final class PreviewEngine: @unchecked Sendable {
         .jm-meta-row { display: contents; }
         .jm-meta-block dt { font-weight: 600; color: #4b5563; }
         .jm-meta-block dd { margin: 0; }
+        .jm-math-display {
+            display: block;
+            margin: 0 0 1em;
+            overflow-x: auto;
+        }
+        .jm-math-inline {
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 0.25em 0;
+        }
+        .katex-display > .katex { white-space: nowrap; }
         </style>
+        \(mathAssetTags())
+        \(mathBootstrapScript())
         </head>
-        <body>\(body)</body>
+        <body><main id="jm-preview-root">\(body)</main><script>window.__justmarkPrimeMath(document.getElementById('jm-preview-root'));</script></body>
         </html>
         """
     }
@@ -195,9 +213,26 @@ public final class PreviewEngine: @unchecked Sendable {
         .jm-meta-row { display: contents; }
         .jm-meta-block dt { font-weight: 600; color: #4b5563; }
         .jm-meta-block dd { margin: 0; }
+        .jm-math-display {
+            display: block;
+            margin: 0 0 1em;
+            overflow-x: auto;
+        }
+        .jm-math-inline {
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 0.25em 0;
+        }
+        .katex-display > .katex { white-space: nowrap; }
         </style>
+        \(mathAssetTags())
+        \(mathBootstrapScript())
         </head>
-        <body>\(body)</body>
+        <body><main id="jm-preview-root">\(body)</main><script>window.__justmarkPrimeMath(document.getElementById('jm-preview-root'));</script></body>
         </html>
         """
     }
@@ -206,8 +241,12 @@ public final class PreviewEngine: @unchecked Sendable {
         let document = parseDocument(markdown)
         try Task.checkCancellation()
 
-        let rawBodyHTML = try Down(markdownString: document.bodyMarkdown).toHTML(.unsafe)
-        let bodyHTML = postprocessRenderedHTML(rawBodyHTML)
+        let mathProcessed = preprocessMath(in: document.bodyMarkdown)
+        let rawBodyHTML = try Down(markdownString: mathProcessed.markdown).toHTML(.unsafe)
+        let bodyHTML = renderMathPlaceholders(
+            in: postprocessRenderedHTML(rawBodyHTML),
+            placeholders: mathProcessed.placeholders
+        )
         if document.metadata.isEmpty {
             return bodyHTML
         }
@@ -448,6 +487,309 @@ public final class PreviewEngine: @unchecked Sendable {
         return slug.isEmpty ? "section" : slug
     }
 
+    private func preprocessMath(in markdown: String) -> PreprocessedMathDocument {
+        let displayPass = preprocessDisplayMath(in: markdown)
+        let inlinePass = preprocessInlineMath(in: displayPass.markdown, startingAt: displayPass.placeholders.count)
+        return PreprocessedMathDocument(
+            markdown: inlinePass.markdown,
+            placeholders: displayPass.placeholders + inlinePass.placeholders
+        )
+    }
+
+    private func preprocessDisplayMath(in markdown: String) -> PreprocessedMathDocument {
+        let lines = markdown.components(separatedBy: "\n")
+        var processed: [String] = []
+        var placeholders: [MathPlaceholder] = []
+        var index = 0
+        var inFence = false
+
+        while index < lines.count {
+            let line = lines[index]
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            if isFenceDelimiter(trimmed) {
+                inFence.toggle()
+                processed.append(line)
+                index += 1
+                continue
+            }
+
+            if !inFence, trimmed == "$$" || trimmed == "\\[" {
+                let closing = trimmed == "$$" ? "$$" : "\\]"
+                var cursor = index + 1
+                var content: [String] = []
+
+                while cursor < lines.count {
+                    let candidate = lines[cursor].trimmingCharacters(in: .whitespaces)
+                    if candidate == closing {
+                        let token = mathToken(for: placeholders.count)
+                        placeholders.append(
+                            .init(token: token, expression: content.joined(separator: "\n"), displayMode: true)
+                        )
+                        processed.append(token)
+                        index = cursor + 1
+                        break
+                    }
+                    content.append(lines[cursor])
+                    cursor += 1
+                }
+
+                if cursor < lines.count {
+                    continue
+                }
+            }
+
+            processed.append(line)
+            index += 1
+        }
+
+        return PreprocessedMathDocument(markdown: processed.joined(separator: "\n"), placeholders: placeholders)
+    }
+
+    private func preprocessInlineMath(in markdown: String, startingAt offset: Int) -> PreprocessedMathDocument {
+        var output = ""
+        var placeholders: [MathPlaceholder] = []
+        var index = markdown.startIndex
+        var nextTokenIndex = offset
+        var inFence = false
+
+        while index < markdown.endIndex {
+            if markdown[index...].hasPrefix("```") || markdown[index...].hasPrefix("~~~") {
+                inFence.toggle()
+                output.append(contentsOf: markdown[index...markdown.index(index, offsetBy: 2)])
+                index = markdown.index(index, offsetBy: 3)
+                continue
+            }
+
+            if inFence {
+                output.append(markdown[index])
+                index = markdown.index(after: index)
+                continue
+            }
+
+            if markdown[index] == "`" {
+                let delimiterCount = consecutiveCharacterCount(in: markdown, from: index, matching: "`")
+                let delimiter = String(repeating: "`", count: delimiterCount)
+                output.append(delimiter)
+                index = markdown.index(index, offsetBy: delimiterCount)
+                if let range = markdown[index...].range(of: delimiter) {
+                    output.append(contentsOf: markdown[index..<range.lowerBound])
+                    output.append(delimiter)
+                    index = range.upperBound
+                }
+                continue
+            }
+
+            if markdown[index...].hasPrefix("\\("), let closing = markdown[index...].range(of: "\\)") {
+                let expressionStart = markdown.index(index, offsetBy: 2)
+                let expression = String(markdown[expressionStart..<closing.lowerBound])
+                let token = mathToken(for: nextTokenIndex)
+                placeholders.append(.init(token: token, expression: expression, displayMode: false))
+                output.append(token)
+                nextTokenIndex += 1
+                index = closing.upperBound
+                continue
+            }
+
+            if markdown[index] == "$",
+               let closing = findInlineDollarClosing(in: markdown, from: markdown.index(after: index)) {
+                let expression = String(markdown[markdown.index(after: index)..<closing])
+                if !expression.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    let token = mathToken(for: nextTokenIndex)
+                    placeholders.append(.init(token: token, expression: expression, displayMode: false))
+                    output.append(token)
+                    nextTokenIndex += 1
+                    index = markdown.index(after: closing)
+                    continue
+                }
+            }
+
+            output.append(markdown[index])
+            index = markdown.index(after: index)
+        }
+
+        return PreprocessedMathDocument(markdown: output, placeholders: placeholders)
+    }
+
+    private func renderMathPlaceholders(in html: String, placeholders: [MathPlaceholder]) -> String {
+        placeholders.reduce(html) { partial, placeholder in
+            partial.replacingOccurrences(
+                of: placeholder.token,
+                with: renderedMathHTML(for: placeholder)
+            )
+        }
+    }
+
+    private func renderedMathHTML(for placeholder: MathPlaceholder) -> String {
+        if let rendered = KaTeXRenderer.shared.render(
+            expression: placeholder.expression,
+            displayMode: placeholder.displayMode,
+            assetResolver: { self.mathAssetURL(named: $0) }
+        ) {
+            return placeholder.displayMode
+                ? "<span class=\"jm-math-display\">\(rendered)</span>"
+                : "<span class=\"jm-math-inline\">\(rendered)</span>"
+        }
+
+        let klass = placeholder.displayMode ? "jm-math-placeholder jm-math-display" : "jm-math-placeholder jm-math-inline"
+        return "<span class=\"\(klass)\" data-expr=\"\(escapeHTMLAttribute(placeholder.expression))\"></span>"
+    }
+
+    private func mathToken(for index: Int) -> String {
+        "@@JMATH_\(index)_TOKEN@@"
+    }
+
+    private func findInlineDollarClosing(in markdown: String, from start: String.Index) -> String.Index? {
+        var cursor = start
+        while cursor < markdown.endIndex {
+            let character = markdown[cursor]
+            if character == "\n" {
+                return nil
+            }
+            if character == "\\", markdown.index(after: cursor) < markdown.endIndex {
+                cursor = markdown.index(cursor, offsetBy: 2)
+                continue
+            }
+            if character == "$" {
+                return cursor
+            }
+            cursor = markdown.index(after: cursor)
+        }
+        return nil
+    }
+
+    private func consecutiveCharacterCount(in markdown: String, from index: String.Index, matching character: Character) -> Int {
+        var count = 0
+        var cursor = index
+        while cursor < markdown.endIndex, markdown[cursor] == character {
+            count += 1
+            cursor = markdown.index(after: cursor)
+        }
+        return count
+    }
+
+    private func isFenceDelimiter(_ trimmedLine: String) -> Bool {
+        trimmedLine.hasPrefix("```") || trimmedLine.hasPrefix("~~~")
+    }
+
+    private func mathAssetTags() -> String {
+        [embeddedStylesheetTag(), embeddedScriptTag()]
+            .compactMap { $0 }
+            .joined(separator: "\n")
+    }
+
+    private func mathBootstrapScript() -> String {
+        """
+        <script>
+        window.__justmarkRenderMath = function(root) {
+          if (!root || !window.katex || !window.katex.render) {
+            return Promise.resolve(false);
+          }
+          root.querySelectorAll('.jm-math-placeholder[data-expr]').forEach(function(node) {
+            try {
+              window.katex.render(node.dataset.expr || '', node, {
+                displayMode: node.classList.contains('jm-math-display'),
+                throwOnError: false,
+                strict: 'warn'
+              });
+              node.dataset.rendered = 'true';
+            } catch (error) {
+              console.error('KaTeX render failed', error);
+            }
+          });
+          return (document.fonts && document.fonts.ready)
+            ? document.fonts.ready.then(function() { return true; })
+            : Promise.resolve(true);
+        };
+        window.__justmarkMathReady = Promise.resolve(false);
+        window.__justmarkPrimeMath = function(root) {
+          window.__justmarkMathReady = window.__justmarkRenderMath(root);
+          return window.__justmarkMathReady;
+        };
+        window.__justmarkWaitForMath = function() {
+          return window.__justmarkMathReady || Promise.resolve(true);
+        };
+        </script>
+        """
+    }
+
+    private func embeddedStylesheetTag() -> String? {
+        guard let css = loadMathAssetText(named: "katex.min.css") else { return nil }
+        return "<style>\(rewriteMathFontURLs(in: css))</style>"
+    }
+
+    private func embeddedScriptTag() -> String? {
+        guard let script = loadMathAssetText(named: "katex.min.js") else { return nil }
+        return "<script>\(script)</script>"
+    }
+
+    private func mathAssetURL(named name: String) -> URL? {
+        let candidateBundles = [Bundle.main] + Bundle.allFrameworks + Bundle.allBundles
+        for bundle in candidateBundles {
+            guard let resourceRoot = bundle.resourceURL else { continue }
+            let candidates = [
+                resourceRoot.appendingPathComponent(name),
+                resourceRoot
+                    .appendingPathComponent("Vendor", isDirectory: true)
+                    .appendingPathComponent("KaTeX", isDirectory: true)
+                    .appendingPathComponent(name)
+            ]
+
+            for candidate in candidates where FileManager.default.fileExists(atPath: candidate.path) {
+                return candidate.standardizedFileURL
+            }
+        }
+
+        let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+        let localCandidates = [
+            cwd.appendingPathComponent("Resources", isDirectory: true)
+                .appendingPathComponent("Vendor", isDirectory: true)
+                .appendingPathComponent("KaTeX", isDirectory: true)
+                .appendingPathComponent(name),
+            cwd.deletingLastPathComponent()
+                .appendingPathComponent("Resources", isDirectory: true)
+                .appendingPathComponent("Vendor", isDirectory: true)
+                .appendingPathComponent("KaTeX", isDirectory: true)
+                .appendingPathComponent(name)
+        ]
+
+        for candidate in localCandidates where FileManager.default.fileExists(atPath: candidate.path) {
+            return candidate.standardizedFileURL
+        }
+        return nil
+    }
+
+    private func loadMathAssetText(named name: String) -> String? {
+        guard let url = mathAssetURL(named: name) else { return nil }
+        return try? String(contentsOf: url, encoding: .utf8)
+    }
+
+    private func rewriteMathFontURLs(in css: String) -> String {
+        guard let regex = try? NSRegularExpression(pattern: #"url\((['"]?)(fonts/)?([^'")]+)\1\)"#) else {
+            return css
+        }
+
+        let matches = regex.matches(in: css, range: NSRange(css.startIndex..., in: css)).reversed()
+        var result = css
+
+        for match in matches {
+            guard
+                let wholeRange = Range(match.range(at: 0), in: result),
+                let fileRange = Range(match.range(at: 3), in: result),
+                let fontURL = mathAssetURL(named: String(result[fileRange]))
+            else {
+                continue
+            }
+
+            result.replaceSubrange(
+                wholeRange,
+                with: "url(\"\(escapeHTMLAttribute(fontURL.absoluteString))\")"
+            )
+        }
+
+        return result
+    }
+
     private func escapeHTML(_ value: String) -> String {
         value
             .replacingOccurrences(of: "&", with: "&amp;")
@@ -455,9 +797,73 @@ public final class PreviewEngine: @unchecked Sendable {
             .replacingOccurrences(of: ">", with: "&gt;")
             .replacingOccurrences(of: "\"", with: "&quot;")
     }
+
+    private func escapeHTMLAttribute(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\n", with: "&#10;")
+    }
+}
+
+private final class KaTeXRenderer {
+    static let shared = KaTeXRenderer()
+
+    private var context: JSContext?
+    private var loadedAssetPath: String?
+
+    func render(
+        expression: String,
+        displayMode: Bool,
+        assetResolver: (String) -> URL?
+    ) -> String? {
+        guard let scriptURL = assetResolver("katex.min.js") else { return nil }
+        let scriptPath = scriptURL.path
+        if context == nil || loadedAssetPath != scriptPath {
+            guard let script = try? String(contentsOf: scriptURL, encoding: .utf8) else { return nil }
+            let context = JSContext()
+            context?.exceptionHandler = { _, exception in
+                if let exception {
+                    NSLog("KaTeX JS exception: %@", exception)
+                }
+            }
+            context?.evaluateScript(script)
+            self.context = context
+            self.loadedAssetPath = scriptPath
+        }
+
+        guard
+            let context,
+            let katex = context.objectForKeyedSubscript("katex"),
+            !katex.isUndefined
+        else {
+            return nil
+        }
+
+        let options: [String: Any] = [
+            "displayMode": displayMode,
+            "throwOnError": false,
+            "strict": "warn"
+        ]
+
+        return katex.invokeMethod("renderToString", withArguments: [expression, options])?.toString()
+    }
 }
 
 private struct ParsedDocument {
     let metadata: [(String, String)]
     let bodyMarkdown: String
+}
+
+private struct PreprocessedMathDocument {
+    let markdown: String
+    let placeholders: [MathPlaceholder]
+}
+
+private struct MathPlaceholder {
+    let token: String
+    let expression: String
+    let displayMode: Bool
 }
